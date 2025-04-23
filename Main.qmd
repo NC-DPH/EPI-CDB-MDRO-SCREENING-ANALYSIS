@@ -1,0 +1,12 @@
+---
+title: "Main"
+format: html
+editor: visual
+---
+
+```{r loading pac and data}
+library(tidyverse)
+library(Hmisc)
+source("Cleaning.r",local = knitr::knit_global())
+```
+
