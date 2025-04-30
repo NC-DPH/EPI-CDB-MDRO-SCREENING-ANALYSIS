@@ -4,9 +4,52 @@ format: html
 editor: visual
 ---
 
-```{r loading pac and data}
+```{r loading pac and data clean}
 library(tidyverse)
 library(Hmisc)
+
 source("Cleaning.r",local = knitr::knit_global())
+
+data <- data[-c(1),]
+
+settingname <- c("Acute care hospital", "Long-term acute care hospital", "Ventilator-capable skilled nursing facility", "Skilled nursing facility/nursing home", "Assisted living facility/adult care home", "Dialysis", "Other",".", "Unknown")
+
+data$setting <- settingname[data$setting]
+
+screendata <- data %>% filter(redcap_repeat_instrument == "screening_abstraction")
+
+
+```
+
+#What is the proportion of initial screenings that identify positives (of the same organism or carbapenemase)
+
+```{r}
+#same org
+#Get rid of NAs, assume NAs are 0
+screendata$pps_num_p1[is.na(screendata$pps_num_p1)] <- 0
+
+#create column that classifies cases based on whether a positive was id'd
+prop <- screendata %>% 
+  mutate(initialscreenid = case_when(pps_num_p1 == 0 ~ "No positives within screen",
+                                     pps_num_p1 > 0 ~ "Positive within screen"))
+
+#get counts of each class, create frequency column
+prop %>% 
+  group_by(initialscreenid) %>% 
+  summarise(n = n()) %>% 
+  mutate(freq = n/sum(n))
+
+#for any org
+screendata$pps_totalpos_p1[is.na(screendata$pps_totalpos_p1)] <- 0
+
+prop <- screendata %>% 
+  mutate(initialscreenidany = case_when(pps_totalpos_p1 == 0 ~ "No positives within screen",
+                                     pps_totalpos_p1 > 0 ~ "Positive within screen"))
+
+prop %>% 
+  group_by(initialscreenidany) %>% 
+  summarise(n = n()) %>% 
+  mutate(freq = n/sum(n))
+
 ```
 

@@ -366,3 +366,4 @@ levels(data$case_riskfactors___9.factor)=c("Unchecked","Checked")
 levels(data$case_assist.factor)=c("Patient needs assistance with ADLs/high contact care","Patient is completely ambulatory and does not need assistance with ADLs/high contact care","Unknown")
 levels(data$case_commonareas.factor)=c("Yes","No, patient stays in room","Unknown")
 levels(data$case_abstraction_complete.factor)=c("Incomplete","Unverified","Complete")
+
