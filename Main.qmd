@@ -7,6 +7,7 @@ editor: visual
 ```{r loading pac and data clean}
 library(tidyverse)
 library(Hmisc)
+library(haven)
 
 source("Cleaning.r",local = knitr::knit_global())
 
@@ -16,41 +17,71 @@ settingname <- c("Acute care hospital", "Long-term acute care hospital", "Ventil
 
 data$setting <- settingname[data$setting]
 
+#separate between screen data and case data
 screendata <- data %>% filter(redcap_repeat_instrument == "screening_abstraction")
 
+casedata <- data %>% filter(redcap_repeat_instrument == "case_abstraction")
+
+#getting years into our case data
+casedata <- casedata %>% 
+  left_join(screendata[,c("screening_id", "year")],  by = "screening_id") %>% 
+  unite(year, c("year.x", "year.y"), na.rm = TRUE)
+
+data <- rbind(screendata, casedata)
+
+#pivot long
+screendata <- screendata %>% pivot_longer(cols = starts_with("screen_type"),
+                            names_to = "screening_type",
+                            values_to = "test",
+                            values_transform = list(test = as.integer))
 
 ```
 
 #What is the proportion of initial screenings that identify positives (of the same organism or carbapenemase)
 
 ```{r}
+#counts for 2024
+data2024 <- data %>% filter(year == 2024)
+
+tablescreen <- data2024 %>% filter(redcap_repeat_instrument == "screening_abstraction") %>% 
+  summarise(screencount=n())
+
+table2024 <- data2024 %>%
+  group_by(redcap_repeat_instrument) %>% 
+  summarise(totalpos = n(),
+            distinctscreens = n_distinct(screening_id)) %>% 
+  filter(redcap_repeat_instrument == "case_abstraction")
+
+table2024 <- cbind(tablescreen, table2024)
+
+table2024 <- table2024 %>% mutate(percentage = (distinctscreens/screencount)*100) %>% select(-redcap_repeat_instrument)
+
+table2024
 #same org
-#Get rid of NAs, assume NAs are 0
-screendata$pps_num_p1[is.na(screendata$pps_num_p1)] <- 0
-
 #create column that classifies cases based on whether a positive was id'd
-prop <- screendata %>% 
-  mutate(initialscreenid = case_when(pps_num_p1 == 0 ~ "No positives within screen",
-                                     pps_num_p1 > 0 ~ "Positive within screen"))
-
+#prop <- screendata %>% 
+#  mutate(initialscreenid = case_when(pps_num_p1 == 0 ~ "No positives within PPS",
+#                                     pps_num_p1 > 0 ~ "Positive within PPS"))
+#
 #get counts of each class, create frequency column
-prop %>% 
-  group_by(initialscreenid) %>% 
-  summarise(n = n()) %>% 
-  mutate(freq = n/sum(n))
+#prop %>% 
+#  group_by(initialscreenid) %>% 
+#  summarise(n = n()) %>% 
+#  mutate(freq = n/sum(n))
 
 #for any org
-screendata$pps_totalpos_p1[is.na(screendata$pps_totalpos_p1)] <- 0
 
-prop <- screendata %>% 
-  mutate(initialscreenidany = case_when(pps_totalpos_p1 == 0 ~ "No positives within screen",
-                                     pps_totalpos_p1 > 0 ~ "Positive within screen"))
+#prop <- screendata %>% 
+#  mutate(initialscreenidany = case_when(pps_totalpos_p1 == 0 ~ "No positives within PPS",
+#                                        pps_totalpos_p1 > 0 ~ "Positive within PPS"))
 
-prop %>% 
-  group_by(initialscreenidany) %>% 
-  summarise(n = n()) %>% 
-  mutate(freq = n/sum(n))
+#prop %>% 
+#  group_by(initialscreenidany) %>% 
+#  summarise(n = n()) %>% 
+#  mutate(freq = n/sum(n))
+
+
+
+
 
 ```
-
-Hi this is a new commit
