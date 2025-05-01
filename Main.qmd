@@ -18,19 +18,22 @@ settingname <- c("Acute care hospital", "Long-term acute care hospital", "Ventil
 data$setting <- settingname[data$setting]
 
 #separate between screen data and case data
-screendata <- data %>% filter(redcap_repeat_instrument == "screening_abstraction")
+screendata <- data %>% 
+  filter(redcap_repeat_instrument == "screening_abstraction")
 
-casedata <- data %>% filter(redcap_repeat_instrument == "case_abstraction")
+casedata <- data %>% 
+  filter(redcap_repeat_instrument == "case_abstraction")
 
 #getting years into our case data
 casedata <- casedata %>% 
-  left_join(screendata[,c("screening_id", "year")],  by = "screening_id") %>% 
+  left_join(screendata[,c("screening_id", "year")], by = "screening_id") %>% 
   unite(year, c("year.x", "year.y"), na.rm = TRUE)
 
 data <- rbind(screendata, casedata)
 
 #pivot long
-screendata <- screendata %>% pivot_longer(cols = starts_with("screen_type"),
+screendata <- screendata %>% 
+  pivot_longer(cols = starts_with("screen_type"),
                             names_to = "screening_type",
                             values_to = "test",
                             values_transform = list(test = as.integer))
@@ -41,9 +44,11 @@ screendata <- screendata %>% pivot_longer(cols = starts_with("screen_type"),
 
 ```{r}
 #counts for 2024
-data2024 <- data %>% filter(year == 2024)
+data2024 <- data %>% 
+  filter(year == 2024)
 
-tablescreen <- data2024 %>% filter(redcap_repeat_instrument == "screening_abstraction") %>% 
+tablescreen <- data2024 %>% 
+  filter(redcap_repeat_instrument == "screening_abstraction") %>% 
   summarise(screencount=n())
 
 table2024 <- data2024 %>%
@@ -54,7 +59,9 @@ table2024 <- data2024 %>%
 
 table2024 <- cbind(tablescreen, table2024)
 
-table2024 <- table2024 %>% mutate(percentage = (distinctscreens/screencount)*100) %>% select(-redcap_repeat_instrument)
+table2024 <- table2024 %>% 
+  mutate(percentage = (distinctscreens/screencount)*100) %>% 
+  select(-redcap_repeat_instrument)
 
 table2024
 #same org
