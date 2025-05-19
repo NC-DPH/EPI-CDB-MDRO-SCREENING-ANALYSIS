@@ -31,12 +31,28 @@ casedata <- casedata %>%
 
 data <- rbind(screendata, casedata)
 
-#pivot long
-screendata <- screendata %>% 
+#pivot long screentype
+screendata <- screendata[1:108] 
+
+screendata1 <- screendata %>% 
   pivot_longer(cols = starts_with("screen_type"),
                             names_to = "screening_type",
-                            values_to = "test",
-                            values_transform = list(test = as.integer))
+                            values_to = "screening_type_value",
+                            values_transform = list(screening_type_value = as.integer))
+
+screendata1 <- screendata1 %>% 
+  mutate(screening_type = case_match(screening_type, "screen_type___1" ~ "pps",
+                                     "screen_type___2" ~ "ID_contact",
+                                     "screen_type___3" ~ "flag_contact",
+                                     "screen_type___7" ~ "other",
+                                     "screen_type___9" ~ "unknown"))
+
+#pivot long acquity
+screendata2 <- screendata %>% 
+  pivot_longer(cols = starts_with("pps_acuity_type"),
+                            names_to = "unit_type",
+                            values_to = "unit_value",
+                            values_transform = list(unit_value = as.integer))
 
 ```
 
@@ -64,6 +80,43 @@ table2024 <- table2024 %>%
   select(-redcap_repeat_instrument)
 
 table2024
+
+#Setting Counts - type of healthcare facility where screening occurred
+settingcount <- data %>% 
+  group_by(year, setting) %>% 
+  filter(redcap_repeat_instrument == "screening_abstraction") %>% 
+  summarise(n = n())
+
+settingcount2024 <- settingcount %>% 
+  filter(year == 2024)
+
+settingcount2024
+
+#organism count for 2024
+
+screendataorg <- screendata[c(1, 4, 31:41)]
+
+screendataorg <- screendataorg %>% 
+  pivot_longer(cols = starts_with("organism__"),
+                            names_to = "organism",
+                            values_to = "organism_value",
+                            values_transform = list(organism_value = as.integer)) %>% 
+  mutate(organism = case_match(organism, "organism___1" ~ "C. auris",
+                                     "organism___2" ~ "E. coli",
+                                     "organism___3" ~ "E. cloacae",
+                                     "organism___4" ~ "E. aerogenes",
+                                     "organism___5" ~ "K. pneumoniae",
+                               "organism___6" ~ "K. oxytoca",
+                               "organism___7" ~ "P. aeruginosa",
+                               "organism___8" ~ "A. baumanii",
+                               "organism___9" ~ "No org id",
+                               "organism___10" ~ "Other"))
+
+screendataorg %>% 
+  filter(year == 2024 & organism_value == 1) %>% 
+  group_by(organism) %>% 
+  summarise(n = n())
+
 #same org
 #create column that classifies cases based on whether a positive was id'd
 #prop <- screendata %>% 
