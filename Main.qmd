@@ -34,25 +34,8 @@ data <- rbind(screendata, casedata)
 #pivot long screentype
 screendata <- screendata[1:108] 
 
-screendata1 <- screendata %>% 
-  pivot_longer(cols = starts_with("screen_type"),
-                            names_to = "screening_type",
-                            values_to = "screening_type_value",
-                            values_transform = list(screening_type_value = as.integer))
 
-screendata1 <- screendata1 %>% 
-  mutate(screening_type = case_match(screening_type, "screen_type___1" ~ "pps",
-                                     "screen_type___2" ~ "ID_contact",
-                                     "screen_type___3" ~ "flag_contact",
-                                     "screen_type___7" ~ "other",
-                                     "screen_type___9" ~ "unknown"))
 
-#pivot long acquity
-screendata2 <- screendata %>% 
-  pivot_longer(cols = starts_with("pps_acuity_type"),
-                            names_to = "unit_type",
-                            values_to = "unit_value",
-                            values_transform = list(unit_value = as.integer))
 
 ```
 
@@ -117,31 +100,69 @@ screendataorg %>%
   group_by(organism) %>% 
   summarise(n = n())
 
-#same org
-#create column that classifies cases based on whether a positive was id'd
-#prop <- screendata %>% 
-#  mutate(initialscreenid = case_when(pps_num_p1 == 0 ~ "No positives within PPS",
-#                                     pps_num_p1 > 0 ~ "Positive within PPS"))
-#
-#get counts of each class, create frequency column
-#prop %>% 
-#  group_by(initialscreenid) %>% 
-#  summarise(n = n()) %>% 
-#  mutate(freq = n/sum(n))
+#cpase
+screendatacpase <- screendata[c(1,4,42:51)] %>% 
+  pivot_longer(cols = starts_with("cpase__"),
+                            names_to = "cpase",
+                            values_to = "cpase_value",
+                            values_transform = list(cpase_value = as.integer)) %>% 
+  mutate(cpase = case_match(cpase, "cpase___1" ~ "KPC",
+                                     "cpase___2" ~ "NDM",
+                                     "cpase___3" ~ "OXA23/24",
+                                     "cpase___4" ~ "OXA-48",
+                                     "cpase___5" ~ "VIM",
+                               "cpase___6" ~ "IMP",
+                               "cpase___7" ~ "other",
+                               "cpase___0" ~ "None",
+                               "cpase___9" ~ "Unknown"))
+screendatacpase %>% 
+  filter(year == 2024 & cpase_value == 1) %>% 
+  group_by(cpase) %>% 
+  summarise(n = n())
 
-#for any org
+#Unit acuity
 
-#prop <- screendata %>% 
-#  mutate(initialscreenidany = case_when(pps_totalpos_p1 == 0 ~ "No positives within PPS",
-#                                        pps_totalpos_p1 > 0 ~ "Positive within PPS"))
+unitdata <- screendata[c(1,4, 19:26)] %>% 
+  filter(setting_acuity == 1) %>% 
+  pivot_longer(cols = starts_with("setting_acuity_type"),
+                            names_to = "setting",
+                            values_to = "settingvalue",
+                            values_transform = list(settingvalue = as.integer)) %>% 
+   mutate(setting = case_match(setting, "setting_acuity_type___1" ~ "ICU",
+                                     "setting_acuity_type___2" ~ "Burn",
+                                     "setting_acuity_type___3" ~ "Vent",
+                                     "setting_acuity_type___4" ~ "Oncology",
+                                     "setting_acuity_type___7" ~ "Other",
+                               "setting_acuity_type___9" ~ "Unknown"))
 
-#prop %>% 
-#  group_by(initialscreenidany) %>% 
-#  summarise(n = n()) %>% 
-#  mutate(freq = n/sum(n))
+unitdata %>% 
+  filter(year==2024 & settingvalue == 1) %>% 
+  group_by(setting) %>% 
+  summarise(n=n())
 
-
-
-
+#int hospitalization
+screendata[c(1,4,30)] %>% 
+  filter(year==2024) %>% 
+  mutate(international = case_match(as.integer(intl_hosp), 
+                                    0 ~ "No history of international hospitalization/care",
+                                    1 ~ "History of international hospitalization/care")) %>%
+  group_by(international) %>% 
+  summarise(n=n())
+  
+#screen type
+screendata1 <- screendata %>% 
+  pivot_longer(cols = starts_with("screen_type"),
+                            names_to = "screening_type",
+                            values_to = "screening_type_value",
+                            values_transform = list(screening_type_value = as.integer)) %>% 
+  mutate(screening_type = case_match(screening_type, "screen_type___1" ~ "pps",
+                                     "screen_type___2" ~ "ID_contact",
+                                     "screen_type___3" ~ "flag_contact",
+                                     "screen_type___7" ~ "other",
+                                     "screen_type___9" ~ "unknown"))
+screendata1 %>% 
+  filter(year==2024 & screening_type_value == 1) %>% 
+  group_by(screening_type) %>% 
+  summarise(n=n())
 
 ```
