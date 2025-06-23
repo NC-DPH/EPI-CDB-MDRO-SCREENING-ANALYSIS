@@ -21,6 +21,7 @@ data$setting <- settingname[data$setting]
 screendata <- data %>% 
   filter(redcap_repeat_instrument == "screening_abstraction")
 
+screendata <- screendata[1:108] 
 casedata <- data %>% 
   filter(redcap_repeat_instrument == "case_abstraction")
 
@@ -31,11 +32,9 @@ casedata <- casedata %>%
 
 data <- rbind(screendata, casedata)
 
-#pivot long screentype
-screendata <- screendata[1:108] 
-
-
-
+#If screendata has casedata
+screendata <- screendata %>% 
+  mutate(positive_id = ifelse(screening_id %in% casedata$screening_id, "Positive screen", "Negative screen"))
 
 ```
 
@@ -141,12 +140,11 @@ unitdata %>%
   summarise(n=n())
 
 #int hospitalization
-screendata[c(1,4,30)] %>% 
-  filter(year==2024) %>% 
+screendata %>% 
   mutate(international = case_match(as.integer(intl_hosp), 
                                     0 ~ "No history of international hospitalization/care",
                                     1 ~ "History of international hospitalization/care")) %>%
-  group_by(international) %>% 
+  group_by(international, year) %>% 
   summarise(n=n())
   
 #screen type
