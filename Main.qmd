@@ -21,7 +21,7 @@ data$setting <- settingname[data$setting]
 screendata <- data %>% 
   filter(redcap_repeat_instrument == "screening_abstraction")
 
-screendata <- screendata[1:108] 
+screendata <- screendata
 casedata <- data %>% 
   filter(redcap_repeat_instrument == "case_abstraction")
 
