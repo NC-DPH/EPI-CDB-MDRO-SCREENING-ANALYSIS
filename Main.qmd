@@ -1,13 +1,14 @@
 ---
-title: "Main"
+title: "MDRO Screening Analysis"
 format: html
 editor: visual
 ---
 
-```{r loading pac and data clean}
+```{r loading pac and data clean, include=FALSE}
 library(tidyverse)
 library(Hmisc)
 library(haven)
+library(gt)
 
 source("Cleaning.r",local = knitr::knit_global())
 
@@ -34,13 +35,46 @@ data <- rbind(screendata, casedata)
 
 #If screendata has casedata
 screendata <- screendata %>% 
-  mutate(positive_id = ifelse(screening_id %in% casedata$screening_id, "Positive screen", "Negative screen"))
+  mutate(positive_id = ifelse(screening_id %in% casedata$screening_id, "Positive_screen", "Negative_screen"))
 
+screendata <- screendata[,c(1:110, 258)]
+
+#Function to make table output easier
+#x = dataset (i.e. screendata)
+#yr = year (numeric year)
+#... = groupby groups (i.e. setting, positive_id)
+
+tableclean <- function(x, yr, ...){
+  group_<-enquos(...)
+  
+  x %>% 
+  filter(!year %in% yr & redcap_repeat_instrument == "screening_abstraction") %>% 
+  group_by(!!!group_) %>% 
+  summarise(n = n()) %>% 
+  pivot_wider(names_from = positive_id, values_from = n) %>% 
+  replace(is.na(.), 0) %>% 
+  mutate(total = sum(c_across()),
+         Negative_perc = (Negative_screen/total)*100,
+         Negative_perc = round(Negative_perc, 2),
+         Positive_perc = (Positive_screen/total)*100,
+         Positive_perc = round(Positive_perc, 2))
+}
+
+table2clean <- function(x, yr, ...){
+  group_<-enquos(...)
+  
+  x %>% 
+  filter(!year %in% yr, redcap_repeat_instrument == "screening_abstraction", screening_type_value == 1) %>% 
+  group_by(!!!group_) %>% 
+  summarise(n = n()) %>% 
+  pivot_wider(names_from = screening_type, values_from = n) %>% 
+  mutate(total = sum(c_across(), na.rm = T))  
+}
 ```
 
-#What is the proportion of initial screenings that identify positives (of the same organism or carbapenemase)
+## What is the proportion of initial screenings that identify positives (of the same organism or carbapenemase)?
 
-```{r}
+```{r, include=FALSE}
 #counts for 2024
 data2024 <- data %>% 
   filter(year == 2024)
@@ -64,21 +98,16 @@ table2024 <- table2024 %>%
 table2024
 
 #Setting Counts - type of healthcare facility where screening occurred
-settingcount <- data %>% 
-  group_by(year, setting) %>% 
-  filter(redcap_repeat_instrument == "screening_abstraction") %>% 
-  summarise(n = n())
 
-settingcount2024 <- settingcount %>% 
-  filter(year == 2024)
+settingcount <- tableclean(screendata, 2019, setting, positive_id)
 
-settingcount2024
+settingcount
+
 
 #organism count for 2024
 
-screendataorg <- screendata[c(1, 4, 31:41)]
 
-screendataorg <- screendataorg %>% 
+screendataorg <- screendata %>% 
   pivot_longer(cols = starts_with("organism__"),
                             names_to = "organism",
                             values_to = "organism_value",
@@ -92,15 +121,14 @@ screendataorg <- screendataorg %>%
                                "organism___7" ~ "P. aeruginosa",
                                "organism___8" ~ "A. baumanii",
                                "organism___9" ~ "No org id",
-                               "organism___10" ~ "Other"))
+                               "organism___10" ~ "Other")) %>% 
+  filter(organism_value==1) %>% 
+  tableclean(2019, organism, positive_id)
 
-screendataorg %>% 
-  filter(year == 2024 & organism_value == 1) %>% 
-  group_by(organism) %>% 
-  summarise(n = n())
+screendataorg
 
 #cpase
-screendatacpase <- screendata[c(1,4,42:51)] %>% 
+screendatacpase <- screendata %>% 
   pivot_longer(cols = starts_with("cpase__"),
                             names_to = "cpase",
                             values_to = "cpase_value",
@@ -113,42 +141,42 @@ screendatacpase <- screendata[c(1,4,42:51)] %>%
                                "cpase___6" ~ "IMP",
                                "cpase___7" ~ "other",
                                "cpase___0" ~ "None",
-                               "cpase___9" ~ "Unknown"))
-screendatacpase %>% 
-  filter(year == 2024 & cpase_value == 1) %>% 
-  group_by(cpase) %>% 
-  summarise(n = n())
+                               "cpase___9" ~ "Unknown")) %>% 
+  filter(cpase_value == 1) %>% 
+  tableclean(2019, cpase, positive_id)
+
+screendatacpase 
 
 #Unit acuity
 
-unitdata <- screendata[c(1,4, 19:26)] %>% 
+unitdata <- screendata %>% 
   filter(setting_acuity == 1) %>% 
   pivot_longer(cols = starts_with("setting_acuity_type"),
-                            names_to = "setting",
+                            names_to = "setting1",
                             values_to = "settingvalue",
                             values_transform = list(settingvalue = as.integer)) %>% 
-   mutate(setting = case_match(setting, "setting_acuity_type___1" ~ "ICU",
+   mutate(setting1 = case_match(setting1, "setting_acuity_type___1" ~ "ICU",
                                      "setting_acuity_type___2" ~ "Burn",
                                      "setting_acuity_type___3" ~ "Vent",
                                      "setting_acuity_type___4" ~ "Oncology",
                                      "setting_acuity_type___7" ~ "Other",
-                               "setting_acuity_type___9" ~ "Unknown"))
+                               "setting_acuity_type___9" ~ "Unknown")) %>% 
+  filter(settingvalue == 1) %>% 
+  tableclean(2019, setting1, positive_id)
 
-unitdata %>% 
-  filter(year==2024 & settingvalue == 1) %>% 
-  group_by(setting) %>% 
-  summarise(n=n())
+unitdata
 
 #int hospitalization
-screendata %>% 
+inthosdata <- screendata %>% 
   mutate(international = case_match(as.integer(intl_hosp), 
                                     0 ~ "No history of international hospitalization/care",
-                                    1 ~ "History of international hospitalization/care")) %>%
-  group_by(international, year) %>% 
-  summarise(n=n())
+                                    1 ~ "History of international hospitalization/care")) %>% 
+  tableclean(2019, international, positive_id)
   
+inthosdata
+
 #screen type
-screendata1 <- screendata %>% 
+screentypedata <- screendata %>% 
   pivot_longer(cols = starts_with("screen_type"),
                             names_to = "screening_type",
                             values_to = "screening_type_value",
@@ -157,10 +185,153 @@ screendata1 <- screendata %>%
                                      "screen_type___2" ~ "ID_contact",
                                      "screen_type___3" ~ "flag_contact",
                                      "screen_type___7" ~ "other",
-                                     "screen_type___9" ~ "unknown"))
-screendata1 %>% 
-  filter(year==2024 & screening_type_value == 1) %>% 
-  group_by(screening_type) %>% 
-  summarise(n=n())
+                                     "screen_type___9" ~ "unknown")) %>% 
+  filter(screening_type_value == 1) %>% 
+  tableclean(2019, screening_type, positive_id)
 
+screentypedata
+
+#Index risk factors
+screentypedata <- screendata %>% 
+  pivot_longer(cols = starts_with("index_lda"),
+                            names_to = "risk_factor",
+                            values_to = "risk_factor_value",
+                            values_transform = list(risk_factor_value = as.integer)) %>% 
+  mutate(risk_factor = case_match(risk_factor, "index_lda___1" ~ "open/draining wounds",
+                                     "index_lda___2" ~ "ET/NT/Tracheostomy",
+                                     "index_lda___3" ~ "central lines (inc. PICCs)",
+                                     "index_lda___4" ~ "other indwelling devices",
+                                     "index_lda___5" ~ "immunocompromised",
+                                     "index_lda___6" ~ "diagnosed with other MDROs",
+                                     "index_lda___7" ~ "international healthcare or travel",
+                                     "index_lda___0" ~ "none",
+                                     "index_lda___9" ~ "unknown")) %>% 
+  filter(risk_factor_value == 1) %>% 
+  tableclean(2019, risk_factor, positive_id)
+
+screentypedata
+
+#precautions
+
+precautiondata <- screendata %>% 
+  mutate(cp_ebp = case_match(as.integer(cp_ebp),
+                             1 ~ "yes",
+                             0 ~ "no",
+                             9 ~ "unknown")) %>% 
+  tableclean(2019, cp_ebp, positive_id)
+
+precautiondata
+
+#Pan Resistance
+resistancedata <- screendata %>% 
+  mutate(pns = case_match(as.integer(pns),
+                          1 ~ "yes",
+                          2 ~ "no",
+                          NA ~ "unknown")) %>% 
+  tableclean(2019, pns, positive_id)
+
+resistancedata
+
+#ADLS
+adldata <- screendata %>% 
+  mutate(index_assist = case_match(as.integer(index_assist),
+                                   1 ~ "yes",
+                                   2 ~ "no",
+                                   3 ~ "unknown")) %>% 
+  tableclean(2019, index_assist, positive_id)
+
+adldata
+
+#Common area
+areadata <- screendata %>% 
+  mutate(index_commonareas = case_match(as.integer(index_commonareas),
+                                        1 ~ "yes",
+                                        2 ~ "no",
+                                        9 ~ "unknown")) %>% 
+  tableclean(2019, index_commonareas, positive_id)
+
+areadata
 ```
+
+### Table 1
+
+```{r, echo=FALSE}
+#Table1
+table1 <- rbind(screendataorg, screendatacpase, inthosdata, unitdata, screentypedata, settingcount, resistancedata, adldata, areadata)
+
+colnames(table1)[c(1,7:14)] <- c("Index organism", "Index case mechansim", "History of travel", "High acquity units", "Index case risk factors", "Facility type", "Is index organism Pan-R", "Index case require ADL", "Index case use common areas")
+
+table1 <- table1 %>% 
+  pivot_longer(cols = where(is.character),
+               names_to = "group",
+               values_to = "Measure",
+               values_drop_na = T)
+
+table1 <- table1[,c(6,7,1,4,2,5,3)]
+
+gttab1 <- table1 %>% 
+  arrange(desc(total)) %>% 
+  gt(rowname_col = "Measure",groupname_col = "group", row_group_as_column = T) %>% 
+  row_group_order(groups = c("Index organism", "Index case mechansim", "Is index organism Pan-R", "Facility type", "High acquity units", "History of travel", "Index case risk factors", "Index case require ADL", "Index case use common areas"))
+
+gttab1 <- gttab1 %>% 
+  summary_rows(columns = c(Negative_screen, Positive_screen, total),
+               fns = list(total = ~sum(.,na.rm= T))) %>% 
+  summary_rows(fns = list(total = ~ round(sum(table1$Negative_screen)/sum(table1$total)*100,2)), columns = c(Negative_perc)) %>% 
+  summary_rows(fns = list(total = ~ round(sum(table1$Positive_screen)/sum(table1$total)*100,2)), columns = c(Positive_perc)) %>% 
+  cols_label(Measure = md("**Measure**"),
+    Negative_screen = md("**Negative screen**"),
+    Negative_perc = md("**%**"),
+    Positive_screen = md("**Positive screen**"),
+    Positive_perc = md("**%**"),
+    total = md("**Total**"))
+
+gt_list <- map(.x = 1:6, .f = function(x){
+  gttab1 %>% 
+      opt_stylize(style = x) %>% 
+    tab_header(title = "Cool title",
+           subtitle = paste("style", x)) %>% 
+  tab_footnote(footnote = "Cool Footnote")
+})
+
+htmltools::tagList(gt_list)
+```
+
+###Table 2
+
+```{r, include=FALSE}
+screentypedata2 <- screendata %>% 
+  pivot_longer(cols = starts_with("screen_type"),
+                            names_to = "screening_type",
+                            values_to = "screening_type_value",
+                            values_transform = list(screening_type_value = as.integer)) %>% 
+  mutate(screening_type = case_match(screening_type, "screen_type___1" ~ "pps",
+                                     "screen_type___2" ~ "ID_contact",
+                                     "screen_type___3" ~ "flag_contact",
+                                     "screen_type___7" ~ "other",
+                                     "screen_type___9" ~ "unknown")) %>% 
+  filter(screening_type_value==1)
+
+screentypedata2 %>% table2clean(2019, positive_id, screening_type)
+
+screendataorg2 <- screentypedata2 %>% 
+  pivot_longer(cols = starts_with("organism__"),
+                            names_to = "organism",
+                            values_to = "organism_value",
+                            values_transform = list(organism_value = as.integer)) %>% 
+  mutate(organism = case_match(organism, "organism___1" ~ "C. auris",
+                                     "organism___2" ~ "E. coli",
+                                     "organism___3" ~ "E. cloacae",
+                                     "organism___4" ~ "E. aerogenes",
+                                     "organism___5" ~ "K. pneumoniae",
+                               "organism___6" ~ "K. oxytoca",
+                               "organism___7" ~ "P. aeruginosa",
+                               "organism___8" ~ "A. baumanii",
+                               "organism___9" ~ "No org id",
+                               "organism___10" ~ "Other")) %>% 
+  filter(organism_value == 1) %>% 
+  table2clean(2019, organism, screening_type)
+
+screendataorg2
+```
+
