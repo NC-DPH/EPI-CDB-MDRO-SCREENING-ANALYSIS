@@ -10,12 +10,15 @@
 #  Notes:       Can use existing R code in GitHub to create parent file
 #            
 
+install.packages("table1")
+
 
 library(sqldf)
 library(dplyr)
 library(haven)
 library(tidyverse)
 library(writexl)
+library(table1)
 
 #Import SAS dataset (or better, follow instructions to import directly from RedCap into R)
 
@@ -29,7 +32,7 @@ MDRO_working_2 <- MDRO_working %>% slice(-c(1,2))
 MDRO_working_2$screening_id_new <-   substr(MDRO_working_2$screening_id, 1, 9)
 
 #SQL written for SAS cleaned RedCap datasets
-#SQL 1
+#SQL 1 take only variables we need
 MDRO_clean_1 <- sqldf(" 
 select
 
@@ -234,14 +237,20 @@ select
   
 from MDRO_clean_3_screenings")
 
-MDRO_clean_final_positives <- sqldf("
-select 
 
- screening_id_new,
-  parent_prompt, organism_prompt, setting_case, contact_prec, wound, endo, cenline, othindwell, immuno, priorMDRO, trav, none, miss, hiacutiy_setting_scrn, MDRO_identified
+#Don't necessarily need a positives only table right now
+#MDRO_clean_final_positives <- sqldf("
+#select 
+
+# screening_id_new,
+#  parent_prompt, organism_prompt, setting_case, contact_prec, wound, endo, cenline, othindwell, immuno, priorMDRO, trav, none, miss, hiacutiy_setting_scrn, MDRO_identified
   
-from MDRO_clean_3_screenings
-                                    where MDRO_identified in (1)")
+#from MDRO_clean_3_screenings
+#                                   where MDRO_identified in (1)")
+
+#R specifc blank to NA stuff
+
+MDRO_clean_final[MDRO_clean_final == ''] <- NA
 
 
 #Export final datasets
@@ -249,60 +258,107 @@ from MDRO_clean_3_screenings
 write_xlsx(MDRO_clean_final, "C:\\Users\\mhoskins1\\Desktop\\Work Files\\MDRO Screening RedCap\\MDRO_clean_PPS_ALL.xlsx")
 write_xlsx(MDRO_clean_final_positives, "C:\\Users\\mhoskins1\\Desktop\\Work Files\\MDRO Screening RedCap\\MDRO_clean_PPS_Positives.xlsx")
 
+#Begin tables
+
+MDRO_clean_final$MDRO_identified <- 
+  factor(MDRO_clean_final$MDRO_identified, 
+ 
+         labels=c("Negative Screen", # Ref = 0
+                  "Positive Screen"))
+
+#label sections of table
+label(MDRO_clean_final$parent_prompt)       <- "CRE Prompting Screening (or C.auris)"
+label(MDRO_clean_final$organism_prompt)       <- "Organism Prompting screening"
+label(MDRO_clean_final$setting_case)     <- "Screening Setting"
+label(MDRO_clean_final$hiacutiy_setting_scrn) <- "High Acuity Setting (If Applicable)"
+label(MDRO_clean_final$contact_prec) <- "Patient on Contact Precautions"
+
+# Select and group just risk factors, basically a pivot long without the pivot. Stacking columns dropping blanks for true totals
+
+  risk_factor_test <- sqldf("
+select
+
+MDRO_identified,
+case when wound not in ('None') then wound else '' end as risk_factor_new 
+from MDRO_clean_final
+    where risk_factor_new not in ('')
+  
+  
+
+union all
+select
+
+MDRO_identified,
+case when endo not in ('None') then endo else '' end as risk_factor_new 
+from MDRO_clean_final
+    where risk_factor_new not in ('')
+
+union all
+select
+
+MDRO_identified,
+case when cenline not in ('None') then cenline else '' end as risk_factor_new 
+from MDRO_clean_final
+    where risk_factor_new not in ('')
+
+union all
+select
+
+MDRO_identified,
+case when othindwell not in ('None') then othindwell else '' end as risk_factor_new 
+from MDRO_clean_final 
+    where risk_factor_new not in ('')
+
+union all
+select
+
+MDRO_identified,
+case when immuno not in ('None') then immuno else '' end as risk_factor_new 
+from MDRO_clean_final
+    where risk_factor_new not in ('')
+
+union all
+select
+
+MDRO_identified,
+case when priorMDRO not in ('None') then priorMDRO else '' end as risk_factor_new 
+from MDRO_clean_final 
+    where risk_factor_new not in ('')
+
+union all
+select
+
+MDRO_identified,
+case when trav not in ('None') then trav else '' end as risk_factor_new 
+from MDRO_clean_final 
+    where risk_factor_new not in ('')
+
+union all
+select
+
+MDRO_identified,
+case when none not in ('None') then none else '' end as risk_factor_new 
+from MDRO_clean_final
+    where risk_factor_new not in ('')
+    
+union all
+select
+
+MDRO_identified,
+case when miss not in ('None') then miss else '' end as risk_factor_new 
+from MDRO_clean_final 
+    where risk_factor_new not in ('')
+")
 
 
+#risk factor label
+  label(risk_factor_test$risk_factor_new)<- "Index Case Risk Factors"
+    #Don't display column counts for risk factors, it's confusing because each event can have >1 risk factor
+column_headers <- function(label, n){as.character(label)}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-source("Cleaning.r",local = knitr::knit_global())
-
-screentypedata2 <- data %>% 
-  pivot_longer(cols = starts_with("screen_type"),
-               names_to = "screening_type",
-               values_to = "screening_type_value",
-               values_transform = list(screening_type_value = as.integer)) %>% 
-  mutate(screening_type = case_match(screening_type, "screen_type___1" ~ "pps",
-                                     "screen_type___2" ~ "ID_contact",
-                                     "screen_type___3" ~ "flag_contact",
-                                     "screen_type___7" ~ "other",
-                                     "screen_type___9" ~ "unknown"))
-
-
-
-mutate(screening_type = case_match(screening_type, "screen_type___1" ~ "pps",
-                                   "screen_type___2" ~ "ID_contact",
-                                   "screen_type___3" ~ "flag_contact",
-                                   "screen_type___7" ~ "other",
-                                   "screen_type___9" ~ "unknown"))
-
-
-
-#
-mutate(setting1 = case_match(setting1, "setting_acuity_type___1" ~ "ICU",
-                             "setting_acuity_type___2" ~ "Burn",
-                             "setting_acuity_type___3" ~ "Vent",
-                             "setting_acuity_type___4" ~ "Oncology",
-                             "setting_acuity_type___7" ~ "Other",
-                             "setting_acuity_type___9" ~ "Unknown")) %>% 
-  filter(settingvalue == 1) %>% 
-
-
-
-
-
+#Run tables
+table1(~ parent_prompt + organism_prompt + setting_case  + hiacutiy_setting_scrn + contact_prec | MDRO_identified, data=MDRO_clean_final, render.missing = NULL,  caption=caption, footnote=footnote)
+table1(~ risk_factor_new | MDRO_identified, data=risk_factor_test, render.strat = column_headers, render.missing = NULL, caption=caption, footnote=footnote)
 
 
 
