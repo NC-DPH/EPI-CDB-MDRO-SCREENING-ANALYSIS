@@ -24,11 +24,11 @@ casedata <- data %>%
   filter(redcap_repeat_instrument == "case_abstraction")
 
 #getting years into our case data
-casedata <- casedata %>% 
-  left_join(screendata[,c("screening_id", "year")], by = "screening_id") %>% 
-  unite(year, c("year.x", "year.y"), na.rm = TRUE)
+#casedata <- casedata %>% 
+#  left_join(screendata[,c("screening_id", "year")], by = "screening_id") %>% 
+#  unite(year, c("year.x", "year.y"), na.rm = TRUE)
 
-data <- rbind(screendata, casedata)
+#data <- rbind(screendata, casedata)
 
 #If screendata has casedata
 screendata <- screendata %>% 
@@ -77,26 +77,26 @@ table2clean <- function(x, yr, ...){
 
 ```{r, include=FALSE}
 #counts for 2024
-data2024 <- data %>% 
-  filter(year == 2024)
+#data2024 <- data %>% 
+#  filter(year == 2024)
 
-tablescreen <- data2024 %>% 
-  filter(redcap_repeat_instrument == "screening_abstraction") %>% 
-  summarise(screencount=n())
+#tablescreen <- data2024 %>% 
+#  filter(redcap_repeat_instrument == "screening_abstraction") %>% 
+#  summarise(screencount=n())
 
-table2024 <- data2024 %>%
-  group_by(redcap_repeat_instrument) %>% 
-  summarise(totalpos = n(),
-            distinctscreens = n_distinct(screening_id)) %>% 
-  filter(redcap_repeat_instrument == "case_abstraction")
+#table2024 <- data2024 %>%
+#  group_by(redcap_repeat_instrument) %>% 
+#  summarise(totalpos = n(),
+#            distinctscreens = n_distinct(screening_id)) %>% 
+#  filter(redcap_repeat_instrument == "case_abstraction")
 
-table2024 <- cbind(tablescreen, table2024)
+#table2024 <- cbind(tablescreen, table2024)
 
-table2024 <- table2024 %>% 
-  mutate(percentage = (distinctscreens/screencount)*100) %>% 
-  select(-redcap_repeat_instrument)
+#table2024 <- table2024 %>% 
+#  mutate(percentage = (distinctscreens/screencount)*100) %>% 
+#  select(-redcap_repeat_instrument)
 
-table2024
+#table2024
 
 #Setting Counts - type of healthcare facility where screening occurred
 
@@ -338,11 +338,11 @@ screendataorg2
 
 
 ```{r}
-screendata <- screendata %>% filter(screen_type___1 == 1)
+screendata2 <- screendata %>% filter(screen_type___1 == 1)
 
 #Setting Counts - type of healthcare facility where screening occurred
 
-settingcount <- tableclean(screendata, 2019, setting, positive_id)
+settingcount <- tableclean(screendata2, 2019, setting, positive_id)
 
 settingcount
 
@@ -350,7 +350,7 @@ settingcount
 #organism count for 2024
 
 
-screendataorg <- screendata %>% 
+screendataorg <- screendata2 %>% 
   pivot_longer(cols = starts_with("organism__"),
                             names_to = "organism",
                             values_to = "organism_value",
@@ -371,7 +371,7 @@ screendataorg <- screendata %>%
 screendataorg
 
 #cpase
-screendatacpase <- screendata %>% 
+screendatacpase <- screendata2 %>% 
   pivot_longer(cols = starts_with("cpase__"),
                             names_to = "cpase",
                             values_to = "cpase_value",
@@ -392,7 +392,7 @@ screendatacpase
 
 #Unit acuity
 
-unitdata <- screendata %>% 
+unitdata <- screendata2 %>% 
   filter(setting_acuity == 1) %>% 
   pivot_longer(cols = starts_with("setting_acuity_type"),
                             names_to = "setting1",
@@ -410,7 +410,7 @@ unitdata <- screendata %>%
 unitdata
 
 #int hospitalization
-inthosdata <- screendata %>% 
+inthosdata <- screendata2 %>% 
   mutate(international = case_match(as.integer(intl_hosp), 
                                     0 ~ "No history of international hospitalization/care",
                                     1 ~ "History of international hospitalization/care")) %>% 
@@ -419,7 +419,7 @@ inthosdata <- screendata %>%
 inthosdata
 
 #screen type
-screentypedata <- screendata %>% 
+screentypedata <- screendata2 %>% 
   pivot_longer(cols = starts_with("screen_type"),
                             names_to = "screening_type",
                             values_to = "screening_type_value",
@@ -435,7 +435,7 @@ screentypedata <- screendata %>%
 screentypedata
 
 #Index risk factors
-screentypedata <- screendata %>% 
+screentypedata <- screendata2 %>% 
   pivot_longer(cols = starts_with("index_lda"),
                             names_to = "risk_factor",
                             values_to = "risk_factor_value",
@@ -456,7 +456,7 @@ screentypedata
 
 #precautions
 
-precautiondata <- screendata %>% 
+precautiondata <- screendata2 %>% 
   mutate(cp_ebp = case_match(as.integer(cp_ebp),
                              1 ~ "yes",
                              0 ~ "no",
@@ -467,7 +467,7 @@ precautiondata <- screendata %>%
 precautiondata
 
 #Pan Resistance
-resistancedata <- screendata %>% 
+resistancedata <- screendata2 %>% 
   mutate(pns = case_match(as.integer(pns),
                           1 ~ "yes",
                           2 ~ "no",
@@ -477,7 +477,7 @@ resistancedata <- screendata %>%
 resistancedata
 
 #ADLS
-adldata <- screendata %>% 
+adldata <- screendata2 %>% 
   mutate(index_assist = case_match(as.integer(index_assist),
                                    1 ~ "yes",
                                    2 ~ "no",
@@ -487,7 +487,7 @@ adldata <- screendata %>%
 adldata
 
 #Common area
-areadata <- screendata %>% 
+areadata <- screendata2 %>% 
   mutate(index_commonareas = case_match(as.integer(index_commonareas),
                                         1 ~ "yes",
                                         2 ~ "no",
@@ -495,5 +495,12 @@ areadata <- screendata %>%
   tableclean(2019, index_commonareas, positive_id)
 
 areadata
+```
+
+## Risk
+
+```{r}
+screendatarisk <- screendata %>% 
+  mutate(positive_id = ifelse(screening_id %in% casedata$screening_id, 1, 2))
 ```
 
