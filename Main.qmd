@@ -274,7 +274,7 @@ table1 <- table1[,c(6,7,1,4,2,5,3)]
 gttab1 <- table1 %>% 
   arrange(desc(total)) %>% 
   gt(rowname_col = "Measure",groupname_col = "group", row_group_as_column = T) %>% 
-  row_group_order(groups = c("Index organism", "Index case mechansim", "Is index organism Pan-R", "Facility type", "High acquity units", "History of travel", "Index case risk factors", "Index case require ADL", "Index case use common areas"))
+  row_group_order(groups = c("Index organism", "Index case mechansim", "Is index organism Pan-R", "Facility type", "High acquity units", "History of travel", "Index case risk factors", "Index case require ADL", "Index case use common areas")) 
 
 gttab1 <- gttab1 %>% 
   summary_rows(columns = c(Negative_screen, Positive_screen, total),
@@ -286,22 +286,18 @@ gttab1 <- gttab1 %>%
     Negative_perc = md("**%**"),
     Positive_screen = md("**Positive screen**"),
     Positive_perc = md("**%**"),
-    total = md("**Total**"))
+    total = md("**Total**")) %>% 
+  opt_stylize(style = 2) %>% 
+    tab_header(title = "Table 1",
+               subtitle = "Counts for screening activities") %>% 
+  tab_footnote(footnote = "Footnote")
 
-gt_list <- map(.x = 1:6, .f = function(x){
-  gttab1 %>% 
-      opt_stylize(style = x) %>% 
-    tab_header(title = "Cool title",
-           subtitle = paste("style", x)) %>% 
-  tab_footnote(footnote = "Cool Footnote")
-})
-
-htmltools::tagList(gt_list)
+gttab1
 ```
 
-###Table 2
+### Table 2
 
-```{r, echo=FALSE}
+```{r, include=FALSE}
 screentypedata2 <- screendata %>% 
   pivot_longer(cols = starts_with("screen_type"),
                             names_to = "screening_type",
@@ -337,20 +333,20 @@ screendataorg2
 ```
 
 
-```{r}
+```{r, include=FALSE}
 screendata2 <- screendata %>% filter(screen_type___1 == 1)
 
 #Setting Counts - type of healthcare facility where screening occurred
 
-settingcount <- tableclean(screendata2, 2019, setting, positive_id)
+settingcount2 <- tableclean(screendata2, 2019, setting, positive_id)
 
-settingcount
+settingcount2
 
 
 #organism count for 2024
 
 
-screendataorg <- screendata2 %>% 
+screendataorg2 <- screendata2 %>% 
   pivot_longer(cols = starts_with("organism__"),
                             names_to = "organism",
                             values_to = "organism_value",
@@ -368,10 +364,10 @@ screendataorg <- screendata2 %>%
   filter(organism_value==1) %>% 
   tableclean(2019, organism, positive_id)
 
-screendataorg
+screendataorg2
 
 #cpase
-screendatacpase <- screendata2 %>% 
+screendatacpase2 <- screendata2 %>% 
   pivot_longer(cols = starts_with("cpase__"),
                             names_to = "cpase",
                             values_to = "cpase_value",
@@ -388,11 +384,11 @@ screendatacpase <- screendata2 %>%
   filter(cpase_value == 1) %>% 
   tableclean(2019, cpase, positive_id)
 
-screendatacpase 
+screendatacpase2
 
 #Unit acuity
 
-unitdata <- screendata2 %>% 
+unitdata2 <- screendata2 %>% 
   filter(setting_acuity == 1) %>% 
   pivot_longer(cols = starts_with("setting_acuity_type"),
                             names_to = "setting1",
@@ -407,19 +403,19 @@ unitdata <- screendata2 %>%
   filter(settingvalue == 1) %>% 
   tableclean(2019, setting1, positive_id)
 
-unitdata
+unitdata2
 
 #int hospitalization
-inthosdata <- screendata2 %>% 
+inthosdata2 <- screendata2 %>% 
   mutate(international = case_match(as.integer(intl_hosp), 
                                     0 ~ "No history of international hospitalization/care",
                                     1 ~ "History of international hospitalization/care")) %>% 
   tableclean(2019, international, positive_id)
   
-inthosdata
+inthosdata2
 
 #screen type
-screentypedata <- screendata2 %>% 
+screentypedata2 <- screendata2 %>% 
   pivot_longer(cols = starts_with("screen_type"),
                             names_to = "screening_type",
                             values_to = "screening_type_value",
@@ -432,10 +428,10 @@ screentypedata <- screendata2 %>%
   filter(screening_type_value == 1) %>% 
   tableclean(2019, screening_type, positive_id)
 
-screentypedata
+screentypedata2
 
 #Index risk factors
-screentypedata <- screendata2 %>% 
+screentypedata2 <- screendata2 %>% 
   pivot_longer(cols = starts_with("index_lda"),
                             names_to = "risk_factor",
                             values_to = "risk_factor_value",
@@ -452,11 +448,11 @@ screentypedata <- screendata2 %>%
   filter(risk_factor_value == 1) %>% 
   tableclean(2019, risk_factor, positive_id)
 
-screentypedata
+screentypedata2
 
 #precautions
 
-precautiondata <- screendata2 %>% 
+precautiondata2 <- screendata2 %>% 
   mutate(cp_ebp = case_match(as.integer(cp_ebp),
                              1 ~ "yes",
                              0 ~ "no",
@@ -464,42 +460,81 @@ precautiondata <- screendata2 %>%
                              NA ~ "unknown")) %>% 
   tableclean(2019, cp_ebp, positive_id)
 
-precautiondata
+precautiondata2
 
 #Pan Resistance
-resistancedata <- screendata2 %>% 
+resistancedata2 <- screendata2 %>% 
   mutate(pns = case_match(as.integer(pns),
                           1 ~ "yes",
                           2 ~ "no",
                           NA ~ "unknown")) %>% 
   tableclean(2019, pns, positive_id)
 
-resistancedata
+resistancedata2
 
 #ADLS
-adldata <- screendata2 %>% 
+adldata2 <- screendata2 %>% 
   mutate(index_assist = case_match(as.integer(index_assist),
                                    1 ~ "yes",
                                    2 ~ "no",
                                    3 ~ "unknown")) %>% 
   tableclean(2019, index_assist, positive_id)
 
-adldata
+adldata2
 
 #Common area
-areadata <- screendata2 %>% 
+areadata2 <- screendata2 %>% 
   mutate(index_commonareas = case_match(as.integer(index_commonareas),
                                         1 ~ "yes",
                                         2 ~ "no",
                                         9 ~ "unknown")) %>% 
   tableclean(2019, index_commonareas, positive_id)
 
-areadata
+areadata2
+```
+
+
+```{r, echo=FALSE}
+#Table2
+table2 <- rbind(screendataorg2, screendatacpase2, inthosdata2, unitdata2, screentypedata2, settingcount2, resistancedata2, adldata2, areadata2, precautiondata2)
+
+colnames(table2)[c(1,7:15)] <- c("Index organism", "Index case mechansim", "History of travel", "High acquity units", "Index case risk factors", "Facility type", "Is index organism Pan-R", "Index case require ADL", "Index case use common areas","What type of precautions")
+
+table2 <- table2 %>% 
+  pivot_longer(cols = where(is.character),
+               names_to = "group",
+               values_to = "Measure",
+               values_drop_na = T)
+
+table2 <- table2[,c(6,7,1,4,2,5,3)]
+
+gttab2 <- table2 %>% 
+  arrange(desc(total)) %>% 
+  gt(rowname_col = "Measure",groupname_col = "group", row_group_as_column = T) %>% 
+  row_group_order(groups = c("Index organism", "Index case mechansim", "Is index organism Pan-R", "Facility type", "High acquity units", "History of travel", "Index case risk factors", "Index case require ADL", "Index case use common areas")) 
+
+gttab2 <- gttab2 %>% 
+  summary_rows(columns = c(Negative_screen, Positive_screen, total),
+               fns = list(total = ~sum(.,na.rm= T))) %>% 
+  summary_rows(fns = list(total = ~ round(sum(table1$Negative_screen)/sum(table1$total)*100,2)), columns = c(Negative_perc)) %>% 
+  summary_rows(fns = list(total = ~ round(sum(table1$Positive_screen)/sum(table1$total)*100,2)), columns = c(Positive_perc)) %>% 
+  cols_label(Measure = md("**Measure**"),
+    Negative_screen = md("**Negative screen**"),
+    Negative_perc = md("**%**"),
+    Positive_screen = md("**Positive screen**"),
+    Positive_perc = md("**%**"),
+    total = md("**Total**")) %>% 
+  opt_stylize(style = 2) %>% 
+    tab_header(title = "Table 2",
+               subtitle = "Counts for screening activities which include a PPS") %>% 
+  tab_footnote(footnote = "Footnote")
+
+gttab2
 ```
 
 ## Risk
 
-```{r}
+```{r, include=FALSE}
 screendatarisk <- screendata %>% 
   mutate(positive_id = ifelse(screening_id %in% casedata$screening_id, 1, 2))
 ```
