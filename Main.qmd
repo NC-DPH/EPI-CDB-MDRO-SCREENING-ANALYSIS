@@ -154,7 +154,7 @@ screendatacpase <- screendata %>%
                                      "cpase___5" ~ "VIM",
                                "cpase___6" ~ "IMP",
                                "cpase___7" ~ "other",
-                               "cpase___0" ~ "None",
+                               "cpase___0" ~ "C. auris",
                                "cpase___9" ~ "Unknown")) %>% 
   filter(cpase_value == 1) %>% 
   tableclean(2019, cpase, positive_id)
@@ -274,17 +274,41 @@ areadata <- screendata %>%
   tableclean(2019, index_commonareas, positive_id)
 
 areadata
+
+#groups of risk factors
+groupedriskfactors <- screendata %>% 
+  pivot_longer(cols = starts_with("index_lda"),
+                            names_to = "risk_factor",
+                            values_to = "risk_factor_value",
+                            values_transform = list(risk_factor_value = as.integer)) %>% 
+  mutate(risk_factor = case_match(risk_factor, "index_lda___1" ~ "open/draining wounds",
+                                     "index_lda___2" ~ "ET/NT/Tracheostomy",
+                                     "index_lda___3" ~ "central lines (inc. PICCs)",
+                                     "index_lda___4" ~ "other indwelling devices",
+                                     "index_lda___5" ~ "immunocompromised",
+                                     "index_lda___6" ~ "diagnosed with other MDROs",
+                                     "index_lda___7" ~ "international healthcare or travel",
+                                     "index_lda___0" ~ "none",
+                                     "index_lda___9" ~ "unknown")) %>% 
+  filter(!risk_factor %in% c("none", "unknown")) %>% 
+  group_by(screening_id) %>% 
+  mutate(risk_factor_sum = as.character(sum(risk_factor_value))) %>% 
+  ungroup()%>% 
+  distinct(screening_id, .keep_all = T) %>% 
+  tableclean(2019, risk_factor_sum, positive_id)
+
+groupedriskfactors 
 ```
 
 ### Table 1
 
 ```{r, echo=FALSE}
 #Table1
-table1 <- rbind(screendataorg, screentypedata, screendatacpase, inthosdata, unitdata, screenriskdata, settingcount, resistancedata, precautiondata, acquitydata, totalcount)
+table1 <- rbind(screendataorg, screentypedata, screendatacpase, inthosdata, unitdata, screenriskdata, settingcount, resistancedata, precautiondata, acquitydata, totalcount, groupedriskfactors)
 
-colnames(table1)[c(1,7:16)] <- c("Index organism","Screening activity", "Index case mechansim", "History of travel", "High acuity units", "Index case risk factors", "Facility type", "Is index organism Pan-R","On appropriate of precautions for entire duration of stay?", "Was index patient on high acuity unit?", "Screening results")
+colnames(table1)[c(1,7:17)] <- c("Index organism","Screening activity", "Index case mechansim", "History of travel", "High acuity units", "Index case risk factors", "Facility type", "Is index organism Pan-R","On appropriate of precautions for entire duration of stay?", "Was index patient on high acuity unit?", "Screening results", "Number of risk factors present")
 
-table1groups <- c("Screening results","Screening activity", "Index organism", "Index case mechansim", "Is index organism Pan-R", "Facility type", "Was index patient on high acuity unit?", "High acuity units", "History of travel", "On appropriate of precautions for entire duration of stay?", "Index case risk factors")
+table1groups <- c("Screening results","Screening activity", "Index organism", "Index case mechansim", "Is index organism Pan-R", "Facility type", "Was index patient on high acuity unit?", "High acuity units", "History of travel", "On appropriate of precautions for entire duration of stay?", "Index case risk factors","Number of risk factors present")
 
 #table1groups1 <-table1groups[!table1groups %in% c( "Index case risk factors", "Screening results")]
 
@@ -374,7 +398,7 @@ screendatacpase2 <- screendata2 %>%
                                      "cpase___5" ~ "VIM",
                                "cpase___6" ~ "IMP",
                                "cpase___7" ~ "other",
-                               "cpase___0" ~ "None",
+                               "cpase___0" ~ "C. auris",
                                "cpase___9" ~ "Unknown")) %>% 
   filter(cpase_value == 1) %>% 
   tableclean(2019, cpase, positive_id)
@@ -493,16 +517,40 @@ areadata2 <- screendata2 %>%
   tableclean(2019, index_commonareas, positive_id)
 
 areadata2
+
+#Grouped risk factors
+groupedriskfactors2 <- screendata2 %>% 
+  pivot_longer(cols = starts_with("index_lda"),
+                            names_to = "risk_factor",
+                            values_to = "risk_factor_value",
+                            values_transform = list(risk_factor_value = as.integer)) %>% 
+  mutate(risk_factor = case_match(risk_factor, "index_lda___1" ~ "open/draining wounds",
+                                     "index_lda___2" ~ "ET/NT/Tracheostomy",
+                                     "index_lda___3" ~ "central lines (inc. PICCs)",
+                                     "index_lda___4" ~ "other indwelling devices",
+                                     "index_lda___5" ~ "immunocompromised",
+                                     "index_lda___6" ~ "diagnosed with other MDROs",
+                                     "index_lda___7" ~ "international healthcare or travel",
+                                     "index_lda___0" ~ "none",
+                                     "index_lda___9" ~ "unknown")) %>% 
+  filter(!risk_factor %in% c("none", "unknown")) %>% 
+  group_by(screening_id) %>% 
+  mutate(risk_factor_sum = as.character(sum(risk_factor_value))) %>% 
+  ungroup()%>% 
+  distinct(screening_id, .keep_all = T) %>% 
+  tableclean(2019, risk_factor_sum, positive_id)
+
+groupedriskfactors2
 ```
 
 
 ```{r, echo=FALSE}
 #Table2
-table2 <- rbind(screendataorg2, screendatacpase2, inthosdata2, unitdata2, screentypedata2, settingcount2, resistancedata2,precautiondata2, acquitydata2, totalcount2)
+table2 <- rbind(screendataorg2, screendatacpase2, inthosdata2, unitdata2, screentypedata2, settingcount2, resistancedata2,precautiondata2, acquitydata2, totalcount2, groupedriskfactors2)
 
-colnames(table2)[c(1,7:15)] <- c("Index organism", "Index case mechansim", "History of travel", "High acquity units", "Index case risk factors", "Facility type", "Is index organism Pan-R","On appropriate of precautions for entire duration of stay?", "Was index patient on high acuity unit?", "Screening results")
+colnames(table2)[c(1,7:16)] <- c("Index organism", "Index case mechansim", "History of travel", "High acquity units", "Index case risk factors", "Facility type", "Is index organism Pan-R","On appropriate of precautions for entire duration of stay?", "Was index patient on high acuity unit?", "Screening results", "Number of risk factors present")
 
-table2groups <- c("Screening results", "Index organism", "Index case mechansim", "Is index organism Pan-R", "Facility type", "Was index patient on high acuity unit?", "High acquity units", "History of travel", "On appropriate of precautions for entire duration of stay?", "Index case risk factors")
+table2groups <- c("Screening results", "Index organism", "Index case mechansim", "Is index organism Pan-R", "Facility type", "Was index patient on high acuity unit?", "High acquity units", "History of travel", "On appropriate of precautions for entire duration of stay?", "Index case risk factors", "Number of risk factors present")
 
 table2 <- table2 %>% 
   pivot_longer(cols = where(is.character),
