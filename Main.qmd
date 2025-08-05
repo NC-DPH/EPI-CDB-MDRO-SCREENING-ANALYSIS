@@ -277,6 +277,7 @@ areadata
 
 #groups of risk factors
 groupedriskfactors <- screendata %>% 
+  filter(!index_lda___9 == 1) %>% 
   select(-c("index_lda___0", "index_lda___9")) %>% 
   pivot_longer(cols = starts_with("index_lda"),
                             names_to = "risk_factor",
@@ -518,6 +519,7 @@ areadata2
 
 #Grouped risk factors
 groupedriskfactors2 <- screendata2 %>%
+  filter(!index_lda___9 == 1) %>% 
   select(-c("index_lda___0", "index_lda___9")) %>% 
   pivot_longer(cols = starts_with("index_lda"),
                             names_to = "risk_factor",
