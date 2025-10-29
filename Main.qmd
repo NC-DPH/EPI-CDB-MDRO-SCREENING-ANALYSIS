@@ -33,7 +33,7 @@ casedata <- data %>%
 #If screendata has casedata
 screendata <- screendata %>% 
   mutate(positive_id = ifelse(screening_id %in% casedata$screening_id, "Positive_screen", "Negative_screen"))
-screendata <- screendata %>% filter(screening_abstraction_complete == 2)
+#screendata <- screendata %>% filter(screening_abstraction_complete == 2)
 screendata <- screendata[,c(1:110, 258)] 
   
 
@@ -69,7 +69,13 @@ tableclean <- function(x, yr, ...){
 
 ## What is the proportion of initial screenings that identify positives (of the same organism or carbapenemase)?
 
+### Table 1
+
+#### Raw Table 1
+
 ```{r, include=FALSE}
+#screendata <- screendata %>% filter(!screening_id %in% c("104150668 Durham VIM and KPC Duke University Hospital July 2025", "123"))
+
 totalcount <- screendata %>% tableclean(2019, positive_id)
 totalcount$summary <- "summary"
 
@@ -291,7 +297,11 @@ groupedriskfactors <- screendata %>%
                                      "index_lda___6" ~ "diagnosed with other MDROs",
                                      "index_lda___7" ~ "international healthcare or travel")) %>%
   group_by(screening_id) %>% 
-  mutate(risk_factor_sum = as.character(sum(risk_factor_value))) %>% 
+  mutate(risk_factor_sum = as.character(sum(risk_factor_value)),
+         risk_factor_sum = case_when(risk_factor_sum == 0 ~ "none",
+                                     risk_factor_sum == 1 ~ "1",
+                                     risk_factor_sum == 2 ~ "2",
+                                     risk_factor_sum >= 3 ~ ">=3")) %>% 
   ungroup()%>% 
   distinct(screening_id, .keep_all = T) %>% 
   tableclean(2019, risk_factor_sum, positive_id)
@@ -299,7 +309,7 @@ groupedriskfactors <- screendata %>%
 groupedriskfactors 
 ```
 
-### Table 1
+#### Table 1 generation
 
 ```{r, echo=FALSE}
 #Table1
@@ -320,7 +330,7 @@ table1 <- table1 %>%
 table1 <- table1[,c(6,7,1,4,2,5,3)]
 
 gttab1 <- table1 %>% 
-  arrange(desc(total)) %>% 
+  arrange(desc(total)) %>%
   gt(rowname_col = "Measure",groupname_col = "group", row_group_as_column = T) %>% 
   row_group_order(groups = table1groups) 
 
@@ -350,8 +360,15 @@ gttab1
 
 ### Table 2
 
+#### Raw Table 2
+
 ```{r, include=FALSE}
+#screendata2 <- screendata %>% filter(screen_type___1 == 1, !screening_id %in% c("103906387 Durham C auris Duke June 2024")) #this is excluded because a positive was id from contact, not pps 
+
 screendata2 <- screendata %>% filter(screen_type___1 == 1)
+
+screendata2[screendata2$screening_id=="103906387 Durham C auris Duke June 2024", "positive_id"] <- "Negative_screen" #manually change this to negative for PPS table.
+
 totalcount2 <- screendata2 %>% tableclean(2019, positive_id)
 totalcount2$summary <- "summary"
 #Setting Counts - type of healthcare facility where screening occurred
@@ -534,7 +551,11 @@ groupedriskfactors2 <- screendata2 %>%
                                      "index_lda___7" ~ "international healthcare or travel")) %>% 
  
   group_by(screening_id) %>% 
-  mutate(risk_factor_sum = as.character(sum(risk_factor_value))) %>% 
+  mutate(risk_factor_sum = as.character(sum(risk_factor_value)),
+         risk_factor_sum = case_when(risk_factor_sum == 0 ~ "none",
+                                     risk_factor_sum == 1 ~ "1",
+                                     risk_factor_sum == 2 ~ "2",
+                                     risk_factor_sum >= 3 ~ ">=3")) %>% 
   ungroup()%>% 
   distinct(screening_id, .keep_all = T) %>% 
   tableclean(2019, risk_factor_sum, positive_id)
@@ -542,6 +563,7 @@ groupedriskfactors2 <- screendata2 %>%
 groupedriskfactors2
 ```
 
+#### Table 2 generation
 
 ```{r, echo=FALSE}
 #Table2
@@ -584,9 +606,137 @@ gttab2 <- gttab2 %>%
 gttab2
 ```
 
+### Table 3 Continuous variables
+
+#### Date data
+
+```{r, include=FALSE}
+timelist <- c("timetoreport", "timetoppsreportdate", "timetoppsmdrodate")
+
+datetable <- mutate_at(screendata2, vars(contains("date")), mdy)
+
+timedata <- datetable %>% 
+  mutate(timetoreport = as.numeric(abs(difftime(datetable$report_date, datetable$mdro_date, units = "days"))),
+         timetoppsreportdate =  as.numeric(abs(difftime(datetable$pps_date, datetable$report_date, units = "days"))),
+         timetoppsmdrodate =  as.numeric(abs(difftime(datetable$pps_date, datetable$mdro_date, units = "days")))) %>% 
+  drop_na(timelist)
+
+timesummary <- function(dataset,value_col, group_col){
+ 
+  summary_stats <- dataset %>%
+    mutate(q1 = quantile({{ value_col }}, 0.25, na.rm = TRUE),
+           q3 = quantile({{ value_col }}, 0.75, na.rm = TRUE),
+           iqr = q3 - q1,
+           lower_bound = q1 - 1.5 * iqr,
+           upper_bound = q3 + 1.5 * iqr) %>%
+    # Filter out the outliers
+    filter({{ value_col }} >= lower_bound & {{ value_col }} <= upper_bound) %>%
+    group_by({{ group_col }}) %>% 
+    # Summarize the remaining data
+    summarise(mean = mean({{ value_col }}, na.rm = TRUE),
+              median = median({{ value_col }}, na.rm = TRUE))
+
+  return(summary_stats)
+  
+}
+
+timeoutput1 <- map_df(timelist, ~{timedata %>%
+                   timesummary(value_col = !!sym(.x), group_col = positive_id) %>% 
+                   mutate(timeperiod = .x)})
+
+timeouput2 <- map_df(timelist, ~{timedata %>%
+    filter(organism___8 == 0) %>% 
+    timesummary(value_col = !!sym(.x), group_col = positive_id) %>% 
+    mutate(timeperiod = paste("CRAB removed", .x))})
+
+timeoutput <- rbind(timeoutput1, timeouput2)
+
+timeoutput <- timeoutput %>% 
+  pivot_longer(c("mean", "median"), names_to = "Stat", values_to = "test2") %>% 
+  pivot_wider(names_from = "positive_id", values_from = "test2")
+```
+
+#### Amount of people tested
+
+```{r, echo=FALSE}
+
+amtoutput1 <- screendata2 %>% 
+  timesummary(value_col = as.numeric(pps_denom_p1), group_col = positive_id) %>% 
+  mutate(timeperiod = "Persons tested during PPS")
+
+posonly <- screendata2 %>% 
+  filter(positive_id == "Positive_screen")
+
+amtoutput2 <- posonly %>% 
+  timesummary(pps_totalpos_p1) %>% 
+  mutate(positive_id = "Positive_screen",
+         timeperiod = "Amt positive during first")
+
+amtoutput <- rbind(amtoutput1, amtoutput2)
+
+amtoutput <- amtoutput %>% 
+  pivot_longer(c("mean", "median"), names_to = "Stat", values_to = "test2") %>% 
+  pivot_wider(names_from = "positive_id", values_from = "test2")
+
+
+#per unit
+amtunit <- screendata2 %>%
+  group_by(setting) %>% 
+  summarise(total = sum(pps_denom_p1, na.rm = T),
+            totalpossame = sum(pps_num_p1, na.rm = T),
+            totalposany = sum(pps_num_total, na.rm = T),
+            median = median(as.numeric(pps_denom_p1), na.rm = T),
+            medianpossame = median(as.numeric(pps_num_p1), na.rm = T),
+            medianposany = median(as.numeric(pps_num_total), na.rm = T),
+            mean = mean(as.numeric(pps_denom_p1), na.rm = T),
+            meanpossame = mean(as.numeric(pps_num_p1), na.rm = T),
+            meanposany = mean(as.numeric(pps_num_total), na.rm = T))
+
+amtunitrange <- screendata2 %>%
+  group_by(setting) %>% 
+  summarise(range = range(as.numeric(pps_denom_p1), na.rm = T),
+            rangepossame = range(as.numeric(pps_num_p1), na.rm = T),
+            rangeposany = range(as.numeric(pps_num_total), na.rm = T)) 
+amtunit
+
+amtunitrange
+
+            
+```
+
+#### Table 3 generation
+
+```{r, echo=FALSE}
+table3 <- rbind(timeoutput, amtoutput)
+
+gttable3 <- table3 %>% 
+  gt(groupname_col = "timeperiod", row_group_as_column = T) 
+
+gttable3 %>% opt_stylize(style = 2) %>% 
+    tab_header(title = "Table 3",
+               subtitle = "") %>% 
+  tab_footnote(footnote = "Footnote")
+
+```
+
+#### Screening cases per month
+
+```{r, echo=FALSE}
+datetrend <- timedata %>% 
+  mutate(monyr = floor_date(pps_date, "month")) %>% 
+  group_by(monyr) %>% 
+  summarise(total = sum(pps_denom_p1, na.rm = T))
+
+datetrend %>% 
+  ggplot(aes(x = monyr, y = total))+
+  geom_bar(stat = "identity")+
+  scale_x_date(date_breaks = "1 month",
+               date_labels = "%b %Y")+
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+```
+
 ## Risk
 
 ```{r, include=FALSE}
 
 ```
-
