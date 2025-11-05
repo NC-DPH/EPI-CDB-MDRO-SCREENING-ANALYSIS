@@ -45,8 +45,6 @@ set MDRO_working;
 	screening_id_new = substr(screening_id, 1, 9);
 
 run;
- proc contents data=screening_raw order=varnum;run;
-proc print data=MDRO_working label; run; title;
 
 /*Keep a set of variables -- add/take away as necessary*/
 proc sql;
@@ -510,24 +508,46 @@ proc freq data=MDRO_clean_2_screenings; tables precautions /norow nocol nopercen
 
 
 
+proc sort data=table_1_final_join out=model_1 nodupkey;
+
+	by screening_id rf_groups hiacuity_hirf;
+
+run;
 
 
 
 
-
-
-
+proc freq data=model_1; table setting_class/ norow nocol nopercent nocum;run;
 
 /*Some modeling*/
 proc logistic
 
-data=MDRO_clean_2_screenings descending outmodel=model_PPS;
+data=model_1 descending outmodel=model_PPS plots(only)=(oddsratio(range=clip));
 
-	class pos_result (param=ref ref='0') total_rf (param=ref ref='0');
-	/*building our model using total risk factors, acutiy level, and specific risk factors*/
-	model pos_result = total_rf acuity_new wound endo cenline othindwell immuno	priorMDRO trav none	miss / expb;
+	class pos_result (param=ref ref='0') setting_class (param=ref ref='Acute Care Hospital') rf_groups (param=ref ref='0') precautions (param=ref ref='Yes');
+	/*building our model using total risk factors*/
+	model pos_result = rf_groups precautions setting_class / expb;
 
 run;
+
+
+proc freq data=model_1;
+tables pos_result*rf_groups / norow nocol nopercent expected; exact fisher chisq or relrisk riskdiff;
+run;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -21,7 +21,7 @@ library(knitr)
 
 
 MDRO_PPS_cases_longpivot <- read_excel("C:/Users/mhoskins1/Desktop/Work Files/MDRO Screening RedCap/MDRO_PPS_cases_longpivot.xlsx")
-View(MDRO_PPS_cases_longpivot)
+print(MDRO_PPS_cases_longpivot)
 
 #Reorder for display by frequency later (honestly no idea how I did this, just trial and error)
 reorder_by_freq <- function(x) {
@@ -33,7 +33,8 @@ reorder_by_freq <- function(x) {
 
 vars_to_reorder <- c("case_organism", "case_setting_new", "acuity", 
                      "screening_source", "case_link_new", "wholegenome", 
-                     "precautions", "assist_lvl", "common_area", "mechanism", "riskfactor")
+                     "precautions", "assist_lvl", "common_area", "mechanism", "riskfactor", 
+                     "hiacuity_hictrf", "hiriskfactor")
 
 MDRO_PPS_cases_longpivot[vars_to_reorder] <- 
     lapply(MDRO_PPS_cases_longpivot[vars_to_reorder], reorder_by_freq)
@@ -78,6 +79,8 @@ label(one_to_one_vars$wholegenome) <- "Whole Genome Sequencing Conducted"
 label(one_to_one_vars$precautions) <- "Patient on Precautions"
 label(one_to_one_vars$assist_lvl) <- "Patient's Need for Assistance"
 label(one_to_one_vars$common_area) <- "Patient Access to Common Areas"
+label(one_to_one_vars$hiacuity_hictrf) <- "High Acuity OR 2 + Risk Factors"
+label(one_to_one_vars$hiriskfactor) <- "2+ Risk Factors"
        #Risk factors keeps returning mean/med/SD. Make it a factor (then label)
 one_to_one_vars$count_rf <- factor(one_to_one_vars$count_rf)
 label(one_to_one_vars$count_rf) <- "Number of Risk Factors"
@@ -85,6 +88,7 @@ label(one_to_one_vars$count_rf) <- "Number of Risk Factors"
 #Third table for one-to-one vars (everything except mechanism and risk factors)
 table1(~ case_organism + case_setting_new + acuity + screening_source + count_rf
             + case_link_new + wholegenome + precautions + assist_lvl + common_area 
+            + hiriskfactor + hiacuity_hictrf
        
        , data = one_to_one_vars, render.strat = column_headers)
 
