@@ -2,68 +2,78 @@
 title: "MDRO Screening Analysis"
 format: html
 editor: visual
+date: now
 ---
 
 ```{r loading pac and data clean, include=FALSE}
-library(tidyverse)
-library(Hmisc)
-library(haven)
-library(gt)
+library(tidyverse) #Tidyverse is essential for many functions here
+library(Hmisc) #Needed for the cleaning script that redcap uses
+library(haven) #In case we need to load SAS data
+library(gt) #Used for table generation
 
-source("Cleaning.r",local = knitr::knit_global())
+source("Cleaning.r",
+       local = knitr::knit_global()) #Automatically loads the cleaning script that Redcap produces
 
-settingname <- c("Acute care hospital", "Long-term acute care hospital", "Ventilator-capable skilled nursing facility", "Skilled nursing facility/nursing home", "Assisted living facility/adult care home", "Dialysis", "Other",".", "Unknown")
+settingname <- c("Acute care hospital", 
+                 "Long-term acute care hospital", 
+                 "Ventilator-capable skilled nursing facility", 
+                 "Skilled nursing facility/nursing home", 
+                 "Assisted living facility/adult care home", 
+                 "Dialysis", 
+                 "Other",
+                 ".", 
+                 "Unknown") #Lets do some cleanup while were here, this is a list of names of the actual settings our screenings took place in. 
 
-data$setting <- settingname[data$setting]
+data$setting <- settingname[data$setting] #this replaces the names in the dataset using the settingname list. Order matters 1 = first name in list, 2 = 2nd name in list so on...
 
 #separate between screen data and case data
 screendata <- data %>% 
-  filter(redcap_repeat_instrument == "screening_abstraction")
+  filter(redcap_repeat_instrument == "screening_abstraction") #We need to separate screen data from case data. This is screen data table.
 
 casedata <- data %>% 
-  filter(redcap_repeat_instrument == "case_abstraction")
-
-#getting years into our case data
-#casedata <- casedata %>% 
-#  left_join(screendata[,c("screening_id", "year")], by = "screening_id") %>% 
-#  unite(year, c("year.x", "year.y"), na.rm = TRUE)
-
-#data <- rbind(screendata, casedata)
+  filter(redcap_repeat_instrument == "case_abstraction") #Case data table generated using same method as before.
 
 #If screendata has casedata
+
 screendata <- screendata %>% 
-  mutate(positive_id = ifelse(screening_id %in% casedata$screening_id, "Positive_screen", "Negative_screen"))
-#screendata <- screendata %>% filter(screening_abstraction_complete == 2)
-screendata <- screendata[,c(1:110, 258)] 
+  mutate(positive_id = ifelse(screening_id %in% casedata$screening_id, 
+                              "Positive_screen", 
+                              "Negative_screen")) #We need to create an ID that determines whether a screen found a positive during the first PPS. This looks for matching IDs between the screen data and case data tables. No cases would ever be extracted from negative screens. If there is a match we assign that screen as positive otherwise negative.
+
+screendata <- screendata[,c(1:110, 258)] #Cuts out nonsense columns from the redcap table that we dont need for this analysis
   
-
-#Function to make table output easier
-#x = dataset (i.e. screendata)
-#yr = year (numeric year)
-#... = groupby groups (i.e. setting, positive_id)
-
 tableclean <- function(x, yr, ...){
   
   group_<-enquos(...)
   
   x %>% 
-  filter(!year %in% yr & redcap_repeat_instrument == "screening_abstraction") %>% 
+  filter(!year %in% yr & 
+         redcap_repeat_instrument == "screening_abstraction") %>% 
   group_by(!!!group_) %>% 
   summarise(n = n()) %>% 
-  pivot_wider(names_from = positive_id, values_from = n) %>% 
-  replace(is.na(.), 0) %>% 
+  pivot_wider(names_from = positive_id, 
+              values_from = n) %>% 
+  replace(is.na(.), 
+          0) %>% 
   mutate(total = sum(c_across()),
-         !!"Negative_screen" := if("Negative_screen" %in% colnames(.)){
+         !!"Negative_screen" := if("Negative_screen" %in% colnames(.))
+         {
            Negative_screen
-         } else {0},
+         } else {0}, #This line is saying if there is no negative screen column, make one and insert a 0, otherwise leave it the same
          Negative_perc = (Negative_screen/total)*100,
-         Negative_perc = round(Negative_perc, 2),
-         !!"Positive_screen" := if("Positive_screen" %in% colnames(.)){
+         Negative_perc = round(Negative_perc, 
+                               2),
+         !!"Positive_screen" := if("Positive_screen" %in% colnames(.))
+         {
            Positive_screen
-         } else {0},
+         } else {0}, #This line is saying if there is no Positive screen column, make one and insert a 0, otherwise leave it the same
          Positive_perc = (Positive_screen/total)*100,
          Positive_perc = round(Positive_perc, 2))
-}
+} #Function to make table output easier. This will save us lots of time later on
+#x = dataset (i.e. screendata)
+#yr = year to not include (numeric year)
+#... = groupby groups (i.e. setting, positive_id)
+#honestly this function is a mess and is very specific.
 
 ```
 
@@ -74,10 +84,8 @@ tableclean <- function(x, yr, ...){
 #### Raw Table 1
 
 ```{r, include=FALSE}
-#screendata <- screendata %>% filter(!screening_id %in% c("104150668 Durham VIM and KPC Duke University Hospital July 2025", "123"))
-
-totalcount <- screendata %>% tableclean(2019, positive_id)
-totalcount$summary <- "summary"
+totalcount <- screendata %>% tableclean(2019, positive_id) #shows the power of table function we made, gets total positive and negative screens and gets percents.
+totalcount$summary <- "summary" #We need a column that shows that this is a summary table.
 
 #Setting Counts - type of healthcare facility where screening occurred
 
@@ -658,7 +666,7 @@ timeoutput <- timeoutput %>%
 
 #### Amount of people tested
 
-```{r, echo=FALSE}
+```{r, include=FALSE}
 
 amtoutput1 <- screendata2 %>% 
   timesummary(value_col = as.numeric(pps_denom_p1), group_col = positive_id) %>% 
@@ -683,40 +691,57 @@ amtoutput <- amtoutput %>%
 amtunit <- screendata2 %>%
   group_by(setting) %>% 
   summarise(total = sum(pps_denom_p1, na.rm = T),
-            totalpossame = sum(pps_num_p1, na.rm = T),
-            totalposany = sum(pps_num_total, na.rm = T),
+            #totalpossame = sum(pps_num_p1, na.rm = T),
+            #totalposany = sum(pps_num_total, na.rm = T),
             median = median(as.numeric(pps_denom_p1), na.rm = T),
-            medianpossame = median(as.numeric(pps_num_p1), na.rm = T),
-            medianposany = median(as.numeric(pps_num_total), na.rm = T),
+            #medianpossame = median(as.numeric(pps_num_p1), na.rm = T),
+            #medianposany = median(as.numeric(pps_num_total), na.rm = T),
             mean = mean(as.numeric(pps_denom_p1), na.rm = T),
-            meanpossame = mean(as.numeric(pps_num_p1), na.rm = T),
-            meanposany = mean(as.numeric(pps_num_total), na.rm = T))
+            min = min(pps_denom_p1, na.rm = T),
+            max = max(pps_denom_p1, na.rm = T),
+            range = max - min)
+            #meanpossame = mean(as.numeric(pps_num_p1), na.rm = T),
+            #meanposany = mean(as.numeric(pps_num_total), na.rm = T))
 
 amtunitrange <- screendata2 %>%
   group_by(setting) %>% 
   summarise(range = range(as.numeric(pps_denom_p1), na.rm = T),
             rangepossame = range(as.numeric(pps_num_p1), na.rm = T),
             rangeposany = range(as.numeric(pps_num_total), na.rm = T)) 
-amtunit
-
-amtunitrange
-
-            
 ```
 
 #### Table 3 generation
 
 ```{r, echo=FALSE}
-table3 <- rbind(timeoutput, amtoutput)
+table3 <- rbind(timeoutput, amtoutput) #combine our outputs from ###date data
+
+
+table3timeperiodnames <- rep(c("Time from lab result to report in NCEDSS", "Time to perform PPS from report in NCEDSS date", "Time to perform PPS from lab result", "CRAB removed: Time from lab result to report in NCEDSS", "CRAB removed: Time to perform PPS from report in NCEDSS date", "CRAB removed: Time to perform PPS from lab result", "Amount of patients tested during first PPS", "Amount of patients who tested positive during first PPS"), each = 2) #We need to make the names in table3$timeperiod make more sense. this solution is very dumb and could be solved by fixing previous code names, we repeat this list twice so it is the same vector as table3$timeperiod.
+
+table3$timeperiod <- table3timeperiodnames #Here we match and replace our old names with our new names
 
 gttable3 <- table3 %>% 
   gt(groupname_col = "timeperiod", row_group_as_column = T) 
 
 gttable3 %>% opt_stylize(style = 2) %>% 
-    tab_header(title = "Table 3",
+    tab_header(title = "Table 3 - Time data (days)",
                subtitle = "") %>% 
-  tab_footnote(footnote = "Footnote")
+  tab_footnote(footnote = "Footnote") %>% 
+  fmt_number(decimals = 2)
 
+```
+
+#### Table 4 generation Setting burden
+
+```{r, echo=FALSE}
+gttable32 <- amtunit %>% 
+  gt(row_group_as_column = T) 
+
+gttable32 %>% opt_stylize(style = 2) %>% 
+    tab_header(title = "Table 4 - Facility Burden",
+               subtitle = "Number of patients tested per facility type") %>% 
+  tab_footnote(footnote = "Footnote") %>% 
+  fmt_number(decimals = 2)
 ```
 
 #### Screening cases per month
