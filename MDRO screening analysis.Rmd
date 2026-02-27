@@ -1,0 +1,938 @@
+---
+title: "MDRO Screening Analysis"
+output: 
+  html_document:
+    code_folding: hide
+    toc: TRUE
+    toc_float: TRUE
+date: "`r Sys.Date()`"
+---
+
+```{r setup, message=FALSE, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(table1)
+library(readxl)
+library(knitr)
+library(Hmisc)
+library(rmarkdown)
+library(sqldf)
+library(lubridate)
+library(gt)
+library(janitor)
+library(flextable)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r import_data, include=FALSE}
+
+#Clear existing data and graphics
+rm(list=ls())
+graphics.off()
+#Read Data
+data=read.csv("C:/Users/mksredl/Documents/MDRO screening eval/MDROScreeningDataAna_DATA_Final.csv")
+#Setting Labels
+
+label(data$screening_id)="Screening ID"
+label(data$redcap_repeat_instrument)="Repeat Instrument"
+label(data$redcap_repeat_instance)="Repeat Instance"
+label(data$year)="Year of screening"
+label(data$index_id)="Index case event ID"
+label(data$name)="Abstractor name"
+label(data$arln_id_1)="Additional screening IDs (e.g., ARLN IDs)"
+label(data$arln_id_2)="Additional screening IDs (e.g., ARLN IDs)"
+label(data$arln_id_3)="Additional screening IDs (e.g., ARLN IDs)"
+label(data$arln_id_4)="Additional screening IDs (e.g., ARLN IDs)"
+label(data$arln_id_5)="Additional screening IDs (e.g., ARLN IDs)"
+label(data$arln_id_6)="Additional screening IDs (e.g., ARLN IDs)"
+label(data$arln_id_7)="Additional screening IDs (e.g., ARLN IDs)"
+label(data$arln_id_8)="Additional screening IDs (e.g., ARLN IDs)"
+label(data$arln_id_9)="Additional screening IDs (e.g., ARLN IDs)"
+label(data$arln_id_10)="Additional screening IDs (e.g., ARLN IDs)"
+label(data$setting)="1. In which setting did screening occur? "
+label(data$setting_other)="1a. Other setting"
+label(data$setting_acuity)="2. Was the index case on a high acuity unit such as an ICU, burn unit, ventilator unit, or oncology unit?"
+label(data$setting_acuity_type___1)="2a. What type of high acuity unit? (choice=ICU)"
+label(data$setting_acuity_type___2)="2a. What type of high acuity unit? (choice=Burn unit)"
+label(data$setting_acuity_type___3)="2a. What type of high acuity unit? (choice=Ventilator unit)"
+label(data$setting_acuity_type___4)="2a. What type of high acuity unit? (choice=Oncology unit)"
+label(data$setting_acuity_type___7)="2a. What type of high acuity unit? (choice=Other)"
+label(data$setting_acuity_type___9)="2a. What type of high acuity unit? (choice=Unknown)"
+label(data$setting_acuity_other)="2b. Other type of high acuity setting"
+label(data$reason___1)="3. What was the reason for screening? (check all that apply) (choice=Identified MDRO case)"
+label(data$reason___2)="3. What was the reason for screening? (check all that apply) (choice=Preventative PPS in LTACH or vSNF (as part of a specific initiative beginning in 2023). *Skip to screening activities question and select PPS.)"
+label(data$reason___3)="3. What was the reason for screening? (check all that apply) (choice=Other (*Explain reason for screening in Notes section at bottom of this form.))"
+label(data$intl_hosp)="4. Was the index case identified by admission screening due to a history of international hospitalization or healthcare?"
+label(data$organism___1)="5. Which organism(s) prompted the response?  (choice=C. auris)"
+label(data$organism___2)="5. Which organism(s) prompted the response?  (choice=E. coli)"
+label(data$organism___3)="5. Which organism(s) prompted the response?  (choice=E. cloacae)"
+label(data$organism___4)="5. Which organism(s) prompted the response?  (choice=E. aerogenes/K. aerogenes)"
+label(data$organism___5)="5. Which organism(s) prompted the response?  (choice=K. pneumoniae)"
+label(data$organism___6)="5. Which organism(s) prompted the response?  (choice=K. oxytoca)"
+label(data$organism___7)="5. Which organism(s) prompted the response?  (choice=CRPA)"
+label(data$organism___8)="5. Which organism(s) prompted the response?  (choice=CRAB)"
+label(data$organism___9)="5. Which organism(s) prompted the response?  (choice=No organism identified)"
+label(data$organism___10)="5. Which organism(s) prompted the response?  (choice=Other)"
+label(data$organism_other)="5a. Other organism(s):"
+label(data$cpase___1)="6. Which carbapenemase(s) prompted the response?  (choice=KPC)"
+label(data$cpase___2)="6. Which carbapenemase(s) prompted the response?  (choice=NDM)"
+label(data$cpase___3)="6. Which carbapenemase(s) prompted the response?  (choice=OXA-23/24)"
+label(data$cpase___4)="6. Which carbapenemase(s) prompted the response?  (choice=OXA-48)"
+label(data$cpase___5)="6. Which carbapenemase(s) prompted the response?  (choice=VIM)"
+label(data$cpase___6)="6. Which carbapenemase(s) prompted the response?  (choice=IMP)"
+label(data$cpase___7)="6. Which carbapenemase(s) prompted the response?  (choice=Other)"
+label(data$cpase___0)="6. Which carbapenemase(s) prompted the response?  (choice=None)"
+label(data$cpase___9)="6. Which carbapenemase(s) prompted the response?  (choice=Unknown)"
+label(data$cpase_other)="6a. Other carbapenemase(s):"
+label(data$pns)="7. Is the organism pan non-susceptible (PNS)?"
+label(data$mdro_date)="8. What was the collection date for the first positive lab for the index case?"
+label(data$report_date)="9. What date was the MDRO first reported to public health?"
+label(data$cp_ebp)="10. Was the index case on contact or enhanced barrier precautions for their ENTIRE healthcare stay, including before being diagnosed with the MDRO? "
+label(data$index_lda___1)="11. Do any of the following risk factors apply to the index case? Select all that apply. (choice=Open/draining wounds)"
+label(data$index_lda___2)="11. Do any of the following risk factors apply to the index case? Select all that apply. (choice=Endotracheal tube/Nasotracheal tube/Tracheostomy)"
+label(data$index_lda___3)="11. Do any of the following risk factors apply to the index case? Select all that apply. (choice=Central lines (including PICCs))"
+label(data$index_lda___4)="11. Do any of the following risk factors apply to the index case? Select all that apply. (choice=Other indwelling devices (dialysis catheter, urinary catheter, G tube or NG tube, nephrostomy tube, surgical drain. do not include ostomy.))"
+label(data$index_lda___5)="11. Do any of the following risk factors apply to the index case? Select all that apply. (choice=Immunocompromised)"
+label(data$index_lda___6)="11. Do any of the following risk factors apply to the index case? Select all that apply. (choice=Diagnosed with other MDROs (around the same time or prior to the MDRO that triggered screening))"
+label(data$index_lda___7)="11. Do any of the following risk factors apply to the index case? Select all that apply. (choice=International healthcare or travel)"
+label(data$index_lda___0)="11. Do any of the following risk factors apply to the index case? Select all that apply. (choice=None of the above risk factors are documented)"
+label(data$index_lda___9)="11. Do any of the following risk factors apply to the index case? Select all that apply. (choice=Unknown- there is no documentation in NCEDSS or notes to inform any selection)"
+label(data$index_mdro)="11a. What other MDROs does the index case have?"
+label(data$index_assist)="12. Does the index patient need assistance with ADLs/receive high contact care?"
+label(data$index_commonareas)="13. Has the index patient used common areas (such as rehab room, ambulate in hallway, activity room, etc)?"
+label(data$screen_type___1)="14. What screening activities occurred? Select all that apply. (choice=Point prevalence survey (PPS) (test all patients/residents currently on a unit))"
+label(data$screen_type___2)="14. What screening activities occurred? Select all that apply. (choice=Identify contacts and screen those still admitted)"
+label(data$screen_type___3)="14. What screening activities occurred? Select all that apply. (choice=Flag contacts for screening on readmission)"
+label(data$screen_type___7)="14. What screening activities occurred? Select all that apply. (choice=Other)"
+label(data$screen_type___9)="14. What screening activities occurred? Select all that apply. (choice=Unknown)"
+label(data$pps_count)="15. How many total PPSs were conducted (at this facility, in reponse to the index case carbapenemase/organism)?"
+label(data$ppsonly_count)="16. How many screenings were PPS only?"
+label(data$pps_date)="17. What date was the first PPS performed? "
+label(data$pps_denom_p1)="18. How many people were tested during the first PPS? (number of swabs collected)"
+label(data$pps_num_p1)="19. How many people tested positive during the first PPS, for thesame carbapenemase/organism as the index case?"
+label(data$pps_totalpos_p1)="20. How many total people tested positive during the first PPS, for any carbapenemase or C. auris?"
+label(data$pps_denom_total)="21. How many total tests were conducted across all PPSs? (number of swabs collected)"
+label(data$pps_num_total)="22. How many screening cases were identified across all PPSs?"
+label(data$pps_icu)="23. Were any of the units screened a high acuity unit, such as an ICU, burn unit, ventilator unit, or oncology unit ? "
+label(data$pps_acuity_type___1)="23a. What type of high acuity unit? (choice=ICU)"
+label(data$pps_acuity_type___2)="23a. What type of high acuity unit? (choice=Burn unit)"
+label(data$pps_acuity_type___3)="23a. What type of high acuity unit? (choice=Ventilator unit)"
+label(data$pps_acuity_type___4)="23a. What type of high acuity unit? (choice=Oncology unit)"
+label(data$pps_acuity_type___7)="23a. What type of high acuity unit? (choice=Other)"
+label(data$pps_acuity_type___9)="23a. What type of high acuity unit? (choice=Unknown)"
+label(data$pps_acuity_other)="23b. Other type of high acuity setting"
+label(data$pps_list)="24. Please list the ARLN screening ID, facility type, date, number screened, number positives, and what units were screened for all PPSs in this facility type. For screenings including high acuity units, please break the numbers out by unit if available. "
+label(data$pps_admit)="25. Was the index case still admitted to the facility at the time of the first PPS? "
+label(data$pps_dc_date)="25a. What date was the index case discharged?"
+label(data$pps_refusal_p1)="26. If available: How many patients refused screening during the first screening? "
+label(data$pps_refusal_total)="27. If available: How many patients refused screening during all screenings combined? "
+label(data$adm_criteria)="28. How were contacts defined? Please document this if information is readily available. If unknown, leave blank."
+label(data$adm_total)="29. How many total contacts were identified?"
+label(data$adm_screeningcount)="30. How many total screeningsat this facility included screening contacts (as opposed to being only a PPS)?"
+label(data$adm_date)="31. What date was the first contact-based screening?"
+label(data$adm_tested)="32. How many total contacts  were screened? "
+label(data$adm_pos)="33. How many were positive?"
+label(data$adm_admit)="34. Was the index case still admitted to the facility at the time of the first contact-based screening?"
+label(data$readm_criteria)="35. How were contacts defined? Please document this if information is readily available. If unknown, leave blank."
+label(data$readm_total)="36. How many total contacts were identified who had already been discharged?"
+label(data$readm_date)="37. What date was the first readmitted contact screened?"
+label(data$readm_screened)="38. How many total contacts were screened on readmission?"
+label(data$readm_pos)="39. How many contacts tested positive on readmission?"
+label(data$other_unknown)="14a. If other/unknown, please provide all available info on the screening, including date, number tested, number positive, and who was screened. "
+label(data$notes)="40. Notes (optional)"
+label(data$screening_abstraction_complete)="Complete?"
+label(data$case_id)="NC EDSS event ID(s)"
+label(data$case_name)="Abstractor name"
+label(data$case_organism___1)="C1. Which organism(s) did the person test positive for during screening? (choice=C. auris)"
+label(data$case_organism___2)="C1. Which organism(s) did the person test positive for during screening? (choice=E. coli)"
+label(data$case_organism___3)="C1. Which organism(s) did the person test positive for during screening? (choice=E. cloacae)"
+label(data$case_organism___4)="C1. Which organism(s) did the person test positive for during screening? (choice=E. aerogenes/K. aerogenes)"
+label(data$case_organism___5)="C1. Which organism(s) did the person test positive for during screening? (choice=K. pneumoniae)"
+label(data$case_organism___6)="C1. Which organism(s) did the person test positive for during screening? (choice=K. oxytoca)"
+label(data$case_organism___7)="C1. Which organism(s) did the person test positive for during screening? (choice=CRPA)"
+label(data$case_organism___8)="C1. Which organism(s) did the person test positive for during screening? (choice=CRAB)"
+label(data$case_organism___9)="C1. Which organism(s) did the person test positive for during screening? (choice=No organism identified)"
+label(data$case_organism___10)="C1. Which organism(s) did the person test positive for during screening? (choice=Other)"
+label(data$case_organism_other)="C1a. Other organism:"
+label(data$case_cpase___1)="C2. Which carbapenemase(s) did the person test positive for during screening? (choice=KPC)"
+label(data$case_cpase___2)="C2. Which carbapenemase(s) did the person test positive for during screening? (choice=NDM)"
+label(data$case_cpase___3)="C2. Which carbapenemase(s) did the person test positive for during screening? (choice=OXA-23/24)"
+label(data$case_cpase___4)="C2. Which carbapenemase(s) did the person test positive for during screening? (choice=OXA-48)"
+label(data$case_cpase___5)="C2. Which carbapenemase(s) did the person test positive for during screening? (choice=VIM)"
+label(data$case_cpase___6)="C2. Which carbapenemase(s) did the person test positive for during screening? (choice=IMP)"
+label(data$case_cpase___7)="C2. Which carbapenemase(s) did the person test positive for during screening? (choice=Other)"
+label(data$case_cpase___8)="C2. Which carbapenemase(s) did the person test positive for during screening? (choice=None)"
+label(data$case_cpase___9)="C2. Which carbapenemase(s) did the person test positive for during screening? (choice=Unknown)"
+label(data$case_cpase_other)="C2a. Other carbapenemase: "
+label(data$case_setting)="C3. In which setting was the case screened?"
+label(data$case_setting_other)="C3a. Other setting:"
+label(data$case_acuity)="C4. Was the positive residing on a high acuity unit, such as an ICU, burn unit, ventilator unit, or oncology unit?"
+label(data$case_acuitytype)="C4a. What type of high acuity setting?"
+label(data$case_acuitytypeother)="C4b. Other type of high acuity setting"
+label(data$case_reason)="C5. Why was the person screened? "
+label(data$case_reason_other)="C5a. Please provide all available information about the reason for screening."
+label(data$case_screentype)="C6. Which of the following best describes this screening?"
+label(data$case_link)="C7. Which of the following best describes the epi link between the index case and the screening case?"
+label(data$case_wgs)="C8. Has whole genome sequencing been conducted on this patient and the index case?"
+label(data$case_tbp)="C9. Was this person on transmission-based precautions for their ENTIRE healthcare stay (including before being diagnosed)?"
+label(data$case_riskfactors___1)="C10. Do any of the following risk factors apply to the screening case during their current hospitalization/healthcare stay? Select all that apply. (choice=Open/draining wounds)"
+label(data$case_riskfactors___2)="C10. Do any of the following risk factors apply to the screening case during their current hospitalization/healthcare stay? Select all that apply. (choice=Endotracheal tube/Nasotracheal tube/Tracheostomy)"
+label(data$case_riskfactors___3)="C10. Do any of the following risk factors apply to the screening case during their current hospitalization/healthcare stay? Select all that apply. (choice=Central lines (including PICCs))"
+label(data$case_riskfactors___4)="C10. Do any of the following risk factors apply to the screening case during their current hospitalization/healthcare stay? Select all that apply. (choice=Other indwelling devices (dialysis catheter, urinary catheter, G tube or NG tube, nephrostomy tube, surgical drain. do not include ostomy))"
+label(data$case_riskfactors___5)="C10. Do any of the following risk factors apply to the screening case during their current hospitalization/healthcare stay? Select all that apply. (choice=Immunocompromised)"
+label(data$case_riskfactors___6)="C10. Do any of the following risk factors apply to the screening case during their current hospitalization/healthcare stay? Select all that apply. (choice=Diagnosed with other MDROs (around the same time or prior to the MDRO that triggered screening))"
+label(data$case_riskfactors___7)="C10. Do any of the following risk factors apply to the screening case during their current hospitalization/healthcare stay? Select all that apply. (choice=International healthcare or travel)"
+label(data$case_riskfactors___0)="C10. Do any of the following risk factors apply to the screening case during their current hospitalization/healthcare stay? Select all that apply. (choice=None of the above risk factors are documented)"
+label(data$case_riskfactors___9)="C10. Do any of the following risk factors apply to the screening case during their current hospitalization/healthcare stay? Select all that apply. (choice=Unknown- there is no documentation in NCEDSS or notes to inform any selection)"
+label(data$case_othermdro)="C10a. What other MDRO(s) does the patient have?"
+label(data$case_assist)="C11. Does the screening case need assistance with ADLs/receive high contact care?"
+label(data$case_commonareas)="C12. Has the screening case used common areas (such as rehab room, ambulate in hallway, activity room, etc)?"
+label(data$case_notes)="C13. Notes (optional)"
+label(data$case_abstraction_complete)="Complete?"
+#Setting Units
+
+
+#Setting Factors(will create new variable for factors)
+data$redcap_repeat_instrument.factor = factor(data$redcap_repeat_instrument,levels=c("screening_abstraction","case_abstraction"))
+data$setting.factor = factor(data$setting,levels=c("1","2","3","4","5"))
+data$setting_acuity.factor = factor(data$setting_acuity,levels=c("1","2","9"))
+data$setting_acuity_type___1.factor = factor(data$setting_acuity_type___1,levels=c("0","1"))
+data$setting_acuity_type___2.factor = factor(data$setting_acuity_type___2,levels=c("0","1"))
+data$setting_acuity_type___3.factor = factor(data$setting_acuity_type___3,levels=c("0","1"))
+data$setting_acuity_type___4.factor = factor(data$setting_acuity_type___4,levels=c("0","1"))
+data$setting_acuity_type___7.factor = factor(data$setting_acuity_type___7,levels=c("0","1"))
+data$setting_acuity_type___9.factor = factor(data$setting_acuity_type___9,levels=c("0","1"))
+data$reason___1.factor = factor(data$reason___1,levels=c("0","1"))
+data$reason___2.factor = factor(data$reason___2,levels=c("0","1"))
+data$reason___3.factor = factor(data$reason___3,levels=c("0","1"))
+data$intl_hosp.factor = factor(data$intl_hosp,levels=c("1","0"))
+data$organism___1.factor = factor(data$organism___1,levels=c("0","1"))
+data$organism___2.factor = factor(data$organism___2,levels=c("0","1"))
+data$organism___3.factor = factor(data$organism___3,levels=c("0","1"))
+data$organism___4.factor = factor(data$organism___4,levels=c("0","1"))
+data$organism___5.factor = factor(data$organism___5,levels=c("0","1"))
+data$organism___6.factor = factor(data$organism___6,levels=c("0","1"))
+data$organism___7.factor = factor(data$organism___7,levels=c("0","1"))
+data$organism___8.factor = factor(data$organism___8,levels=c("0","1"))
+data$organism___9.factor = factor(data$organism___9,levels=c("0","1"))
+data$organism___10.factor = factor(data$organism___10,levels=c("0","1"))
+data$cpase___1.factor = factor(data$cpase___1,levels=c("0","1"))
+data$cpase___2.factor = factor(data$cpase___2,levels=c("0","1"))
+data$cpase___3.factor = factor(data$cpase___3,levels=c("0","1"))
+data$cpase___4.factor = factor(data$cpase___4,levels=c("0","1"))
+data$cpase___5.factor = factor(data$cpase___5,levels=c("0","1"))
+data$cpase___6.factor = factor(data$cpase___6,levels=c("0","1"))
+data$cpase___7.factor = factor(data$cpase___7,levels=c("0","1"))
+data$cpase___0.factor = factor(data$cpase___0,levels=c("0","1"))
+data$cpase___9.factor = factor(data$cpase___9,levels=c("0","1"))
+data$pns.factor = factor(data$pns,levels=c("1","2"))
+data$cp_ebp.factor = factor(data$cp_ebp,levels=c("1","0","9"))
+data$index_lda___1.factor = factor(data$index_lda___1,levels=c("0","1"))
+data$index_lda___2.factor = factor(data$index_lda___2,levels=c("0","1"))
+data$index_lda___3.factor = factor(data$index_lda___3,levels=c("0","1"))
+data$index_lda___4.factor = factor(data$index_lda___4,levels=c("0","1"))
+data$index_lda___5.factor = factor(data$index_lda___5,levels=c("0","1"))
+data$index_lda___6.factor = factor(data$index_lda___6,levels=c("0","1"))
+data$index_lda___7.factor = factor(data$index_lda___7,levels=c("0","1"))
+data$index_lda___0.factor = factor(data$index_lda___0,levels=c("0","1"))
+data$index_lda___9.factor = factor(data$index_lda___9,levels=c("0","1"))
+data$index_assist.factor = factor(data$index_assist,levels=c("1","2","3"))
+data$index_commonareas.factor = factor(data$index_commonareas,levels=c("1","2","9"))
+data$screen_type___1.factor = factor(data$screen_type___1,levels=c("0","1"))
+data$screen_type___2.factor = factor(data$screen_type___2,levels=c("0","1"))
+data$screen_type___3.factor = factor(data$screen_type___3,levels=c("0","1"))
+data$screen_type___7.factor = factor(data$screen_type___7,levels=c("0","1"))
+data$screen_type___9.factor = factor(data$screen_type___9,levels=c("0","1"))
+data$pps_icu.factor = factor(data$pps_icu,levels=c("1","0","9"))
+data$pps_acuity_type___1.factor = factor(data$pps_acuity_type___1,levels=c("0","1"))
+data$pps_acuity_type___2.factor = factor(data$pps_acuity_type___2,levels=c("0","1"))
+data$pps_acuity_type___3.factor = factor(data$pps_acuity_type___3,levels=c("0","1"))
+data$pps_acuity_type___4.factor = factor(data$pps_acuity_type___4,levels=c("0","1"))
+data$pps_acuity_type___7.factor = factor(data$pps_acuity_type___7,levels=c("0","1"))
+data$pps_acuity_type___9.factor = factor(data$pps_acuity_type___9,levels=c("0","1"))
+data$pps_admit.factor = factor(data$pps_admit,levels=c("1","2","3","0","9"))
+data$adm_admit.factor = factor(data$adm_admit,levels=c("1","2","3","0","9"))
+data$screening_abstraction_complete.factor = factor(data$screening_abstraction_complete,levels=c("0","1","2"))
+data$case_organism___1.factor = factor(data$case_organism___1,levels=c("0","1"))
+data$case_organism___2.factor = factor(data$case_organism___2,levels=c("0","1"))
+data$case_organism___3.factor = factor(data$case_organism___3,levels=c("0","1"))
+data$case_organism___4.factor = factor(data$case_organism___4,levels=c("0","1"))
+data$case_organism___5.factor = factor(data$case_organism___5,levels=c("0","1"))
+data$case_organism___6.factor = factor(data$case_organism___6,levels=c("0","1"))
+data$case_organism___7.factor = factor(data$case_organism___7,levels=c("0","1"))
+data$case_organism___8.factor = factor(data$case_organism___8,levels=c("0","1"))
+data$case_organism___9.factor = factor(data$case_organism___9,levels=c("0","1"))
+data$case_organism___10.factor = factor(data$case_organism___10,levels=c("0","1"))
+data$case_cpase___1.factor = factor(data$case_cpase___1,levels=c("0","1"))
+data$case_cpase___2.factor = factor(data$case_cpase___2,levels=c("0","1"))
+data$case_cpase___3.factor = factor(data$case_cpase___3,levels=c("0","1"))
+data$case_cpase___4.factor = factor(data$case_cpase___4,levels=c("0","1"))
+data$case_cpase___5.factor = factor(data$case_cpase___5,levels=c("0","1"))
+data$case_cpase___6.factor = factor(data$case_cpase___6,levels=c("0","1"))
+data$case_cpase___7.factor = factor(data$case_cpase___7,levels=c("0","1"))
+data$case_cpase___8.factor = factor(data$case_cpase___8,levels=c("0","1"))
+data$case_cpase___9.factor = factor(data$case_cpase___9,levels=c("0","1"))
+data$case_setting.factor = factor(data$case_setting,levels=c("1","2","3","4","5","6","7","9"))
+data$case_acuity.factor = factor(data$case_acuity,levels=c("1","0"))
+data$case_acuitytype.factor = factor(data$case_acuitytype,levels=c("1","2","3","4","7","9"))
+data$case_reason.factor = factor(data$case_reason,levels=c("1","7","9"))
+data$case_screentype.factor = factor(data$case_screentype,levels=c("1","2","3","9"))
+data$case_link.factor = factor(data$case_link,levels=c("1","2","3","4","5","6","0","9"))
+data$case_wgs.factor = factor(data$case_wgs,levels=c("1","2","0","9"))
+data$case_tbp.factor = factor(data$case_tbp,levels=c("1","0","9"))
+data$case_riskfactors___1.factor = factor(data$case_riskfactors___1,levels=c("0","1"))
+data$case_riskfactors___2.factor = factor(data$case_riskfactors___2,levels=c("0","1"))
+data$case_riskfactors___3.factor = factor(data$case_riskfactors___3,levels=c("0","1"))
+data$case_riskfactors___4.factor = factor(data$case_riskfactors___4,levels=c("0","1"))
+data$case_riskfactors___5.factor = factor(data$case_riskfactors___5,levels=c("0","1"))
+data$case_riskfactors___6.factor = factor(data$case_riskfactors___6,levels=c("0","1"))
+data$case_riskfactors___7.factor = factor(data$case_riskfactors___7,levels=c("0","1"))
+data$case_riskfactors___0.factor = factor(data$case_riskfactors___0,levels=c("0","1"))
+data$case_riskfactors___9.factor = factor(data$case_riskfactors___9,levels=c("0","1"))
+data$case_assist.factor = factor(data$case_assist,levels=c("1","2","9"))
+data$case_commonareas.factor = factor(data$case_commonareas,levels=c("1","2","9"))
+data$case_abstraction_complete.factor = factor(data$case_abstraction_complete,levels=c("0","1","2"))
+
+levels(data$redcap_repeat_instrument.factor)=c("Screening abstraction","Case abstraction")
+levels(data$setting.factor)=c("Acute care hospital","Long-term acute care hospital","Ventilator-capable skilled nursing facility","Skilled nursing facility/nursing home","Assisted living facility/adult care home","Dialysis","Other","Unknown")
+levels(data$setting_acuity.factor)=c("Yes","No","Unknown")
+levels(data$setting_acuity_type___1.factor)=c("Unchecked","Checked")
+levels(data$setting_acuity_type___2.factor)=c("Unchecked","Checked")
+levels(data$setting_acuity_type___3.factor)=c("Unchecked","Checked")
+levels(data$setting_acuity_type___4.factor)=c("Unchecked","Checked")
+levels(data$setting_acuity_type___7.factor)=c("Unchecked","Checked")
+levels(data$setting_acuity_type___9.factor)=c("Unchecked","Checked")
+levels(data$reason___1.factor)=c("Unchecked","Checked")
+levels(data$reason___2.factor)=c("Unchecked","Checked")
+levels(data$reason___3.factor)=c("Unchecked","Checked")
+levels(data$intl_hosp.factor)=c("Yes","No")
+levels(data$organism___1.factor)=c("Unchecked","Checked")
+levels(data$organism___2.factor)=c("Unchecked","Checked")
+levels(data$organism___3.factor)=c("Unchecked","Checked")
+levels(data$organism___4.factor)=c("Unchecked","Checked")
+levels(data$organism___5.factor)=c("Unchecked","Checked")
+levels(data$organism___6.factor)=c("Unchecked","Checked")
+levels(data$organism___7.factor)=c("Unchecked","Checked")
+levels(data$organism___8.factor)=c("Unchecked","Checked")
+levels(data$organism___9.factor)=c("Unchecked","Checked")
+levels(data$organism___10.factor)=c("Unchecked","Checked")
+levels(data$cpase___1.factor)=c("Unchecked","Checked")
+levels(data$cpase___2.factor)=c("Unchecked","Checked")
+levels(data$cpase___3.factor)=c("Unchecked","Checked")
+levels(data$cpase___4.factor)=c("Unchecked","Checked")
+levels(data$cpase___5.factor)=c("Unchecked","Checked")
+levels(data$cpase___6.factor)=c("Unchecked","Checked")
+levels(data$cpase___7.factor)=c("Unchecked","Checked")
+levels(data$cpase___0.factor)=c("Unchecked","Checked")
+levels(data$cpase___9.factor)=c("Unchecked","Checked")
+levels(data$pns.factor)=c("Yes","No")
+levels(data$cp_ebp.factor)=c("Yes","No","Unknown")
+levels(data$index_lda___1.factor)=c("Unchecked","Checked")
+levels(data$index_lda___2.factor)=c("Unchecked","Checked")
+levels(data$index_lda___3.factor)=c("Unchecked","Checked")
+levels(data$index_lda___4.factor)=c("Unchecked","Checked")
+levels(data$index_lda___5.factor)=c("Unchecked","Checked")
+levels(data$index_lda___6.factor)=c("Unchecked","Checked")
+levels(data$index_lda___7.factor)=c("Unchecked","Checked")
+levels(data$index_lda___0.factor)=c("Unchecked","Checked")
+levels(data$index_lda___9.factor)=c("Unchecked","Checked")
+levels(data$index_assist.factor)=c("Yes","No","Unknown")
+levels(data$index_commonareas.factor)=c("Yes","No, patient stays in room","Unknown")
+levels(data$screen_type___1.factor)=c("Unchecked","Checked")
+levels(data$screen_type___2.factor)=c("Unchecked","Checked")
+levels(data$screen_type___3.factor)=c("Unchecked","Checked")
+levels(data$screen_type___7.factor)=c("Unchecked","Checked")
+levels(data$screen_type___9.factor)=c("Unchecked","Checked")
+levels(data$pps_icu.factor)=c("Yes","No","Unknown")
+levels(data$pps_acuity_type___1.factor)=c("Unchecked","Checked")
+levels(data$pps_acuity_type___2.factor)=c("Unchecked","Checked")
+levels(data$pps_acuity_type___3.factor)=c("Unchecked","Checked")
+levels(data$pps_acuity_type___4.factor)=c("Unchecked","Checked")
+levels(data$pps_acuity_type___7.factor)=c("Unchecked","Checked")
+levels(data$pps_acuity_type___9.factor)=c("Unchecked","Checked")
+levels(data$pps_admit.factor)=c("Yes - still admitted to one of the 1st PPS units","Yes - still admitted elsewhere in facility (not on one of the 1st PPS units)","Yes - still admitted, unknown which unit","No","Unknown")
+levels(data$adm_admit.factor)=c("Yes - still admitted to the unit where contact(s) were screened","Yes - still admitted elsewhere in facility (different unit from where contacts screened)","Yes - still admitted, unknown which unit","No","Unknown")
+levels(data$screening_abstraction_complete.factor)=c("Incomplete","Unverified","Complete")
+levels(data$case_organism___1.factor)=c("Unchecked","Checked")
+levels(data$case_organism___2.factor)=c("Unchecked","Checked")
+levels(data$case_organism___3.factor)=c("Unchecked","Checked")
+levels(data$case_organism___4.factor)=c("Unchecked","Checked")
+levels(data$case_organism___5.factor)=c("Unchecked","Checked")
+levels(data$case_organism___6.factor)=c("Unchecked","Checked")
+levels(data$case_organism___7.factor)=c("Unchecked","Checked")
+levels(data$case_organism___8.factor)=c("Unchecked","Checked")
+levels(data$case_organism___9.factor)=c("Unchecked","Checked")
+levels(data$case_organism___10.factor)=c("Unchecked","Checked")
+levels(data$case_cpase___1.factor)=c("Unchecked","Checked")
+levels(data$case_cpase___2.factor)=c("Unchecked","Checked")
+levels(data$case_cpase___3.factor)=c("Unchecked","Checked")
+levels(data$case_cpase___4.factor)=c("Unchecked","Checked")
+levels(data$case_cpase___5.factor)=c("Unchecked","Checked")
+levels(data$case_cpase___6.factor)=c("Unchecked","Checked")
+levels(data$case_cpase___7.factor)=c("Unchecked","Checked")
+levels(data$case_cpase___8.factor)=c("Unchecked","Checked")
+levels(data$case_cpase___9.factor)=c("Unchecked","Checked")
+levels(data$case_setting.factor)=c("Acute care hospital","Long-term acute care hospital","Ventilator-capable skilled nursing facility","Skilled nursing facility/nursing home","Assisted living facility/adult care home","Dialysis","Other","Unknown")
+levels(data$case_acuity.factor)=c("Yes","No")
+levels(data$case_acuitytype.factor)=c("ICU","Burn unit","Ventilator unit","Oncology unit","Other","Unknown")
+levels(data$case_reason.factor)=c("Screening conducted in response to a MDRO case/outbreak","Other","Unknown")
+levels(data$case_screentype.factor)=c("PPS on unit where index case resided","Identified as a contact, still admitted, screened immediately","Identified as a contact, already discharged, screened on readmission","Unknown")
+levels(data$case_link.factor)=c("Roommate","On a unit where the index case resided, unknown if at the same time","On the same unit at the same time","On the same unit where the index case stayed, but not at the same time","In the same room as the index case after them","In the facility at the same time as the index case, but never on the same unit","No overlap in space or time","Unknown")
+levels(data$case_wgs.factor)=c("Yes - confirmed related","Yes - confirmed NOT related","No","Unknown")
+levels(data$case_tbp.factor)=c("Yes","No","Unknown")
+levels(data$case_riskfactors___1.factor)=c("Unchecked","Checked")
+levels(data$case_riskfactors___2.factor)=c("Unchecked","Checked")
+levels(data$case_riskfactors___3.factor)=c("Unchecked","Checked")
+levels(data$case_riskfactors___4.factor)=c("Unchecked","Checked")
+levels(data$case_riskfactors___5.factor)=c("Unchecked","Checked")
+levels(data$case_riskfactors___6.factor)=c("Unchecked","Checked")
+levels(data$case_riskfactors___7.factor)=c("Unchecked","Checked")
+levels(data$case_riskfactors___0.factor)=c("Unchecked","Checked")
+levels(data$case_riskfactors___9.factor)=c("Unchecked","Checked")
+levels(data$case_assist.factor)=c("Patient needs assistance with ADLs/high contact care","Patient is completely ambulatory and does not need assistance with ADLs/high contact care","Unknown")
+levels(data$case_commonareas.factor)=c("Yes","No, patient stays in room","Unknown")
+levels(data$case_abstraction_complete.factor)=c("Incomplete","Unverified","Complete")
+
+# Limit to PPS screens
+pps_data_raw <- data %>% 
+  filter(redcap_repeat_instrument == 'screening_abstraction', screen_type___1 == "1") %>% 
+  mutate(id = substr(screening_id, 1, 9)) %>% 
+  mutate(positive = case_when(
+    id == "103906387" ~ "0", # Positives in contact tracing only
+    pps_num_p1 >= 1 ~ "1",
+    pps_num_total >= 1 ~ "1", 
+    TRUE ~ "0"))
+
+
+pps_data <- pps_data_raw
+
+
+# Make dataset for case data
+case_data_raw <- data %>% 
+  filter(redcap_repeat_instrument == 'case_abstraction')
+
+case_data <- case_data_raw
+
+
+```
+
+
+## Overview
+
+### Questions to discuss 
+
+- How do we characterize differences between positives and negatives beyond just presenting tables stratified by screening outcome (if at all)? 
+- Do we want to present p values for any of our analyses?  - no
+- Are we good with row percents or does that need further discussion?  - row pcts
+- Specific organisms, or CRE grouped together? - group CRE then have subheadings for specific orgs 
+
+$~$
+
+### To do list 
+
+- Gather all analyses we want to include  
+- Add remaining analyses to R document   
+- Tables:
+  - Switch format to janitor/flextable (or others)
+  - Give proper titles 
+  - Make sure all have appropriate row vs. column percentages 
+
+$~$
+
+### Analyses to add
+
+- Screenings over time? 
+
+## Screening-level analysis 
+
+### Organism 
+```{r organism, warning=FALSE}
+
+# Create a table with organism and mechanism in it for easy counts in the future called org_cpase
+
+
+# Get mechanism
+
+mech_list <- pps_data_raw %>% 
+  pivot_longer(cols = starts_with("cpase__"),
+                            names_to = "cpase",
+                            values_to = "cpase_value",
+                            values_transform = list(cpase_value = as.integer)) %>% 
+  mutate(cpase = recode_values(cpase, "cpase___1" ~ "KPC",
+                                     "cpase___2" ~ "NDM",
+                                     "cpase___3" ~ "OXA-23 or OXA-24/40",
+                                     "cpase___4" ~ "OXA-48",
+                                     "cpase___5" ~ "VIM",
+                               "cpase___6" ~ "IMP",
+                               "cpase___7" ~ "Other",
+                               "cpase___0" ~ "None (C. auris)",
+                               "cpase___9" ~ "Unknown")) %>% 
+  filter(!is.na(cpase), cpase_value == 1)
+
+# Deal with records with 2+ carbapenemases
+# dupe_list <- sqldf("
+#   select id, count(distinct cpase) as n_records
+#   from mech_list
+#   group by 1
+#   having n_records > 1
+#   order by 2 desc
+# ", method = "raw")
+# 
+# # print(dupe_list)
+
+# sqldf("
+#       select a.id, cpase
+#       from mech_list a 
+#       inner join dupe_list b on a.id = b.id
+#       order by 1
+#       ")
+
+mech_list <- mech_list %>% 
+  mutate(cpase = case_when(
+    id %in% c("104059845", "104159938") ~ "OXA-23 or OXA-24/40",
+    id %in% c("104098169", "103804569", "104150668", "103884712") ~ "Two carbapenemases",
+    TRUE ~ cpase
+  )) %>% 
+  distinct()
+
+
+# Get organism - no records with 2+ organisms 
+
+org_list <- pps_data %>% 
+  pivot_longer(cols = starts_with("organism"),
+                            names_to = "org",
+                            values_to = "org_value",
+                            values_transform = list(org_value = as.integer)) %>% 
+  mutate(org = recode_values(org,
+                          "organism___1" ~ "C. auris",
+                          "organism___2" ~ "E. coli",
+                          "organism___3" ~ "E. cloacae",
+                          "organism___4" ~ "E. aerogenes", 
+                          "organism___5" ~ "K. pneumoniae",
+                          "organism___6" ~ "K. oxytoca", 
+                          "organism___7" ~ "CRPA", 
+                          "organism___8" ~ "CRAB", 
+                          "organism___9" ~ "No organism identified", 
+                          "organism___10" ~ "Other organism")) %>% 
+  filter(!is.na(org), org_value == 1)
+
+
+# Create data table to work from
+org_cpase <- sqldf("
+                   select a.id, a.screening_id, cpase, org, a.positive
+                   from mech_list a 
+                   left join org_list b on a.screening_id = b.screening_id 
+                   ", method='raw')
+
+
+# Create grouped organism variable
+
+# How to classify cases with other organism?
+# sqldf("
+#       select a.screening_id, b.org, a.organism_other
+#       from pps_data a
+#       inner join org_cpase b on a.screening_id = b.screening_id
+#       where b.org = 'Other organism'
+#       ", method="raw")
+# They're all CRE organisms 
+
+org_cpase <- org_cpase %>% 
+  mutate(org_group=case_when(
+    org %in% c("E. coli", "E. cloacae", "E. aerogenes", "K. pneumoniae", "K. oxytoca", "Other organism") ~ "CRE",
+    TRUE ~ org))
+
+
+
+# Make the table - specific organisms
+org_cpase %>%
+  # Build the table using janitor pkg
+  tabyl(org, positive) %>% 
+  adorn_totals(where = "row") %>% 
+  adorn_percentages(denominator = "row") %>% 
+  adorn_pct_formatting(digits = 1) %>% 
+  adorn_ns(position = "front") %>% 
+  # Make it pretty with flextable pkg
+  qflextable() %>% 
+  set_header_labels(
+    "org" = "Organism",
+    "0" = "Negative screening",
+    "1" = "Positive screening"
+  ) %>% 
+  border_remove() %>% 
+  theme_booktabs() %>% 
+  hline(part = "body", i=9) %>% 
+  set_caption("Organisms by screening outcome")
+
+
+# Make the table - organism groups
+org_cpase %>%
+  # Build the table using janitor pkg
+  tabyl(org_group, positive) %>% 
+  adorn_totals(where = "row") %>% 
+  adorn_percentages(denominator = "row") %>% 
+  adorn_pct_formatting(digits = 1) %>% 
+  adorn_ns(position = "front") %>% 
+  # Make it pretty with flextable pkg
+  qflextable() %>% 
+  set_header_labels(
+    "org_group" = "MDRO type",
+    "0" = "Negative screening",
+    "1" = "Positive screening"
+  ) %>% 
+  border_remove() %>% 
+  theme_booktabs() %>% 
+  hline(part = "body", i=5) %>% 
+  set_caption("MDRO types by screening outcome")
+
+
+```
+
+
+```{r org_old, warning = FALSE}
+
+# This is the old table1 code, but that package can't do row percents 
+# Keeping it for posterity 
+
+
+# Make a function to order counts from highest to lowest in output 
+
+sort_output <- function(dataset, var) {
+  dataset %>% 
+    mutate({{var}} := factor({{var}}, levels = names(sort(table({{var}}),
+                                                          decreasing = TRUE))))
+}
+
+
+org_cpase <- sort_output(org_cpase, org)
+org_cpase <- sort_output(org_cpase, cpase)
+org_cpase <- sort_output(org_cpase, org_group)
+
+
+# Make the table
+org_cpase$positive <- 
+  factor(org_cpase$positive, levels=c(0,1), labels=c("Negative", "Positive"))
+
+
+label(org_cpase$positive) <- "Positive or negative screening"
+label(org_cpase$org) <- "Organism prompting screening"
+label(org_cpase$org_group) <- "Type of MDRO"
+
+caption <- "Organism by screening outcome"
+
+
+table1(~ org + org_group | positive, data=org_cpase, caption=caption)
+
+
+# Define a p value function
+pvalue <- function(x, ...) {
+    # Construct vectors of data y, and groups (strata) g
+    y <- unlist(x)
+    g <- factor(rep(1:length(x), times=sapply(x, length)))
+    if (is.numeric(y)) {
+        # For numeric variables, perform a Mann Whitney U test
+        p <- wilcox.test(y ~ g)$p.value
+    } else {
+        # For categorical variables, perform a chi-squared test of independence
+        p <- chisq.test(table(y, g))$p.value
+    }
+    # Format the p-value, using an HTML entity for the less-than sign.
+    # The initial empty string places the output on the line below the variable label.
+    c("", sub("<", "&lt;", format.pval(p, digits=3, eps=0.001)))
+}
+
+table1(~ org + org_group | positive, data=org_cpase, caption=caption, 
+       extra.col = list("P-value" = pvalue), overall=FALSE)
+
+
+# Save the dataset for future use
+save(org_cpase, file="org_cpase.rdata")
+
+
+
+
+
+
+
+
+
+
+
+```
+
+$~$
+
+
+### Mechanism
+
+```{r mech, eval = FALSE}
+
+# org_cpase <- org_cpase %>% 
+#   remove_labels()
+
+
+# Make the table
+org_cpase %>%
+  # Build the table using janitor pkg
+  tabyl(cpase, positive) %>% 
+  adorn_totals(where = "row") %>% 
+  adorn_percentages(denominator = "row") %>% 
+  adorn_pct_formatting(digits = 1) %>% 
+  adorn_ns(position = "front") %>% 
+  # Make it pretty with flextable pkg
+  qflextable() %>% 
+  set_header_labels(
+    "cpase" = "Mechanism",
+    "0" = "Negative screening",
+    "1" = "Positive screening"
+  ) %>% 
+  border_remove() %>% 
+  theme_booktabs() %>% 
+  hline(part = "body", i=8) %>% 
+  set_caption("Mechanisms by screening outcome")
+
+
+
+
+```
+
+```{r mech_old}
+# See above chunk for how the org_cpase table is created and formatted
+
+caption <- "Mechanism by screening outcome"
+label(org_cpase$cpase) <- "Mechanism prompting screening"
+
+
+table1(~ cpase | positive, data=org_cpase, caption=caption)
+
+table1(~ cpase | positive, data=org_cpase, caption=caption, 
+       extra.col = list("P-value" = pvalue), overall=F)
+
+
+```
+
+  
+$~$
+
+### Setting
+
+```{r setting}
+
+setting_data <- pps_data_raw
+
+setting_data$setting <- 
+  factor(setting_data$setting, 
+         levels = c(1,2,3,4,5),
+         labels = c("Acute care hospital","Long-term acute care hospital","Ventilator-capable skilled nursing facility",
+                    "Skilled nursing facility/nursing home","Assisted living facility/adult care home"))
+
+setting_data <- sort_output(setting_data, setting)
+
+## If acuity is missing, set acuity to low (since it only asked for acuity in settings where high was an option)
+setting_data <- setting_data %>% 
+  mutate(acuity_new = case_when(
+    is.na(setting_acuity) ~ 2,
+    TRUE ~ as.numeric(setting_acuity)
+  ))
+
+setting_data$acuity_new <- 
+  factor(setting_data$acuity_new,
+         levels = c(1,2,9),
+         labels = c("Yes", "No", "Unknown"))
+
+label(setting_data$setting) <- "Screening setting"
+label(setting_data$acuity_new) <- "Index case was on high-acuity unit"
+caption <- "MDRO screenings by setting and acuity level"
+
+setting_data$positive <- 
+  factor(setting_data$positive, levels=c(0,1), labels=c("Negative", "Positive"))
+
+
+table1(~ setting + acuity_new | positive, data=setting_data, caption = caption )
+
+
+```
+
+$~$
+
+### To add: Organism and mechanism by facility type
+
+$~$
+
+### Time to screen
+
+``` {r time_to_screen}
+
+# Calculate time variables
+
+pps_data <- pps_data %>% 
+  mutate(n_tests = pps_denom_p1) %>% 
+  mutate(time_from_report = as.numeric(mdy(pps_date) - mdy(report_date))) %>% 
+  mutate(time_from_dx = as.numeric(mdy(pps_date) - mdy(mdro_date)))
+
+# Define fxn to show median and IQR (rather than median and range, default)
+render.median.IQR <- function(x, ...) {
+  c('', 
+    `Median [IQR]` = sprintf("%s [%s, %s]", median(x, na.rm=TRUE), 
+                             quantile(x, 0.25, na.rm=TRUE), quantile(x, 0.75, na.rm=TRUE)))
+}
+
+
+label(pps_data$time_from_report) <- "Time from report to screening (days)"
+label(pps_data$time_from_dx) <- "Time from specimen collection to screening (days)"
+
+caption <- "Comparison of tests performed and time to test between positive and negative screenings"
+
+table1(~ time_from_report + time_from_dx | positive, data=pps_data, render = render.median.IQR, 
+       caption=caption)
+
+table1(~ time_from_report + time_from_dx | positive, data=pps_data, render = render.median.IQR, 
+       caption=caption, extra.col = list("P-value" = pvalue), overall=F)
+
+
+# Break up timing variables by CRAB vs. non-CRAB
+crab_data <- pps_data %>% 
+  mutate(crab = case_when(
+    organism___8 == 1 ~ "CRAB",
+    TRUE ~ "Non-CRAB"
+  )) 
+
+
+crab_labels <- list(
+  variables = list(
+    time_from_report = "Time from report to screening (days)",
+    time_from_dx = "Time from specimen date to screening (days)"
+  ))
+
+caption <- "PPS time delay for CRAB and non-CRAB screenings"
+
+
+table1(~time_from_report + time_from_dx | crab * positive, data=crab_data, render = render.median.IQR, overall=F, caption=caption)
+
+
+
+```
+
+$~$  
+
+### Risk factors
+
+```{r risk_factors}
+
+
+# Look at risk factors 
+risk_factors <- c("rf_wound", "rf_tube", "rf_line", "rf_device", "rf_immunocomp", "rf_mdro", "rf_intl", "rf_none", "rf_unknown")
+
+risk_data <- pps_data_raw %>% 
+  # Rename them so it's clearer which is which 
+  rename_with(~ risk_factors, index_lda___1:index_lda___9) %>% 
+  # Limit columns to risk factors and positive status
+  select(starts_with("rf_"), positive) %>% 
+  # Get count of risk factors 
+  rowwise() %>% 
+  mutate(risk_factor_count = sum(across(rf_wound:rf_intl))) %>% 
+  ungroup() %>% 
+  # Make it categorical
+  mutate(risk_factor_cat = case_when(
+    risk_factor_count < 3 ~ as.character(risk_factor_count),
+    risk_factor_count >= 3 ~ "3+",
+    TRUE ~ "ERROR"
+  )) %>% 
+  # Factor the remaining variables
+  mutate(across(starts_with("rf_"),
+                ~ factor (.x, levels = c(1,0),
+                          labels = c("Yes", "No")))) 
+
+
+risk_data$positive <- 
+  factor(risk_data$positive, levels=c(0,1), labels=c("Negative", "Positive"))
+
+label(risk_data$rf_wound) <- "Open/draining wounds"
+label(risk_data$rf_tube) <- "Endotracheal tube, nasotracheal tube, or tracheostomy"
+label(risk_data$rf_line) <- "Central lines (including PICCs)"
+label(risk_data$rf_device) <- "Other indwelling devices*"
+label(risk_data$rf_immunocomp) <- "Immunocompromised"
+label(risk_data$rf_mdro) <- "Diagnosed with other MDROs"
+label(risk_data$rf_intl) <- "International healthcare or travel"
+label(risk_data$rf_none) <- "None of the above"
+label(risk_data$rf_unknown) <- "Risk factors not documented"
+
+
+footnote <- "*
+Other indwelling devices include dialysis and urinary catheters, G and NG tubes, nephrostomy tubes, and surgical drains; does not include ostomies. Index cases may have more than one risk factor."
+
+caption <- "Index case risk factors for positive and negative screens"
+
+
+table1(~. | positive, data=risk_data, caption=caption, footnote=footnote)
+
+
+```
+
+
+$~$
+
+### To add: Screenings before vs. after 30 days from dx/report
+
+$~$
+
+### To add: Screenings before vs. after March 2024
+
+$~$
+
+### Other miscellaneous analyses
+
+Variables we don't have complete enough data to analyze:  
+-index_commonareas: Index case uses common areas (73% missing)  
+-pps_refusal_p1: Number of refusals for first screening (61% missing)  
+-pps_refusal_total: Number of refusals across all screenings (93% missing)  
+
+```{r other_stuff}
+
+# Combine options about where pt is admitted 
+pps_data <- pps_data %>% 
+  mutate(admit_new = case_when(
+    pps_admit %in% c(1,2,3) ~ "Yes",
+    pps_admit == 0 ~ "No",
+    pps_admit == 9 ~ "Unknown"
+  )) %>% 
+  mutate(assist_new = case_when(
+    index_assist == 1 ~ "Yes",
+    index_assist == 2 ~ "No",
+    index_assist == 3 ~ "Unknown"
+  ))
+
+pps_data$admit_new <- factor(pps_data$admit_new,
+                             levels = c("Yes", "No", "Unknown"),
+                             ordered = TRUE)
+
+
+pps_data$assist_new <- factor(pps_data$assist_new,
+                             levels = c("Yes", "No", "Unknown"),
+                             ordered = TRUE)
+
+caption <- "Additional comparisons of positive and negative screenings"
+
+label(pps_data$assist_new) <- "Does index case require assistance with ADLs or need high-contact care?"
+label(pps_data$admit_new) <- "Was the index case still admitted at time of first PPS?"
+label(pps_data$cp_ebp.factor) <- "Was the index case on precautions for their entire stay?"
+
+table1(~admit_new + assist_new + cp_ebp.factor | positive, 
+       data=pps_data, caption=caption)
+
+
+label(pps_data$n_tests) <- "Number of tests conducted in first PPS"
+table1(~ n_tests | positive, data=pps_data, render = render.median.IQR, 
+       caption=caption)
+
+table1(~ n_tests | positive, data=pps_data, render = render.median.IQR, 
+       caption=caption, extra.col = list("P-value" = pvalue), overall=F)
+
+
+```
+
+
+
+## Case-level analysis 
+
+### To add: Organism, mechanism, setting, risk factors
