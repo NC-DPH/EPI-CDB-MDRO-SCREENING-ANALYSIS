@@ -379,6 +379,7 @@ screendata2[screendata2$screening_id=="103906387 Durham C auris Duke June 2024",
 
 totalcount2 <- screendata2 %>% tableclean(2019, positive_id)
 totalcount2$summary <- "summary"
+
 #Setting Counts - type of healthcare facility where screening occurred
 
 settingcount2 <- tableclean(screendata2, 2019, setting, positive_id)
@@ -759,9 +760,49 @@ datetrend %>%
                date_labels = "%b %Y")+
   theme(axis.text.x = element_text(angle = 30, hjust = 1))
 ```
+## Supplemental tables
 
-## Risk
+```{r}
+timelist <- c("timetoreport", "timetoppsreportdate", "timetoppsmdrodate")
 
-```{r, include=FALSE}
+datetable <- mutate_at(screendata2, vars(contains("date")), mdy)
+
+timedata <- datetable %>% 
+  mutate(timetoreport = as.numeric(abs(difftime(datetable$report_date, datetable$mdro_date, units = "days"))),
+         timetoppsreportdate =  as.numeric(abs(difftime(datetable$pps_date, datetable$report_date, units = "days"))),
+         timetoppsmdrodate =  as.numeric(abs(difftime(datetable$pps_date, datetable$mdro_date, units = "days")))) %>% 
+  drop_na(timelist)
+
+allscreenAC <- timedata %>% 
+  filter(setting == "Acute care hospital") %>% 
+  mutate(setting_acuity = case_match(as.integer(setting_acuity),
+                                   1 ~ "High acuity Unit",
+                                   2 ~ "Not High acuity Unit",
+                                   9 ~ "unknown")) %>% 
+  group_by(setting, setting_acuity) %>% 
+  summarise(n = n(),
+            mediantests = median(as.integer(na.omit(pps_denom_p1))),
+            IQRtests = IQR(as.integer(na.omit(pps_denom_p1))),
+            mediantimetopps = median(as.integer(na.omit(timetoppsreportdate))),
+            IQRtimetopps = IQR(as.integer(na.omit(timetoppsreportdate))))
+
+allscreenAC$setting_acuity <- str_c(allscreenAC$setting_acuity, allscreenAC$setting, sep = " ")
+
+allscreenother <- timedata %>% 
+  filter(!setting == "Acute care hospital") %>% 
+  mutate(setting_acuity = case_when(setting_acuity >= 1 ~ setting,
+                                    .default = setting)) %>% 
+  group_by(setting_acuity) %>% 
+  summarise(n = n(),
+            mediantests = median(as.integer(na.omit(pps_denom_p1))),
+            IQRtests = IQR(as.integer(na.omit(pps_denom_p1))),
+            mediantimetopps = median(as.integer(na.omit(timetoppsreportdate))),
+            IQRtimetopps = IQR(as.integer(na.omit(timetoppsreportdate))))
+
+testsperfacilitytype <- rbind(allscreenAC, allscreenother) 
+
+testsperfacilitytype[,-1] %>% arrange(desc(n))
 
 ```
+
+
