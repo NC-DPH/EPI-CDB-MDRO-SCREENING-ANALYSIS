@@ -25,6 +25,8 @@ dm 'odsresults; clear';
 
 /*Import latest line list*/
 proc import out=screening_raw
+   /* datafile="T:\HAI\MDRO Surveillance\MDRO screening analysis\REDCap data back ups\MDROScreeningDataAna_DATA_Final.csv"*/
+	
     datafile="T:\HAI\MDRO Surveillance\MDRO screening analysis\REDCap data back ups\MDROScreeningDataAna_DATA_Final.csv"
     dbms=csv
     replace;
@@ -45,6 +47,7 @@ set MDRO_working;
 	screening_id_new = substr(screening_id, 1, 9);
 
 run;
+
 
 /*Keep a set of variables -- add/take away as necessary*/
 proc sql;
@@ -138,8 +141,21 @@ select
 
 	/*More index case factors*/
 	index_assist,
-	index_commonareas
+	index_commonareas,
 
+	/*Some continuous variables*/
+
+	mdro_date, /*date MDRO identified by positive specimen*/
+	report_date, /*date reported to DHHS*/
+	pps_date,/*date PPS initiated*/
+
+	abs(mdro_date - report_date) as IDtoreport,
+	abs(mdro_date - pps_date) as IDtoPPS,
+	abs(report_date - pps_date) as reporttoPPS,
+
+	/*time to event flags*/
+	case when calculated IDtoPPS gt (30) then 1 else 0 end as IDtoPPS_flag,
+	case when calculated reporttoPPS gt (30) then 1 else 0 end as reporttoPPS_flag
 
 from MDRO_working
 	where year GE (2023)
@@ -147,7 +163,7 @@ from MDRO_working
 ;
 quit;
 
-proc freq data=MDRO_clean_1; tables pps_flag/ norow nocol nopercent;run;
+proc print data=MDRO_clean_1 noobs; var screening_id pps_num_p1 pps_num_total;where screening_id = '103906387 Durham C auris Duke June 2024';run;
 
 
 /*Create singular labels defined by each series of variables in a category (simplify our tables): SCREENING SPECIFIC */
@@ -161,7 +177,7 @@ select
 	year,
 
 	/*Positives flag*/
-	case when (pps_num_total) not in (0,.) and screening_id_new not in ('103906387') then 1 else 0 end as pos_result,
+	case when (pps_num_p1) not in (0,.) and screening_id_new not in ('103906387') then 1 else 0 end as pos_result,
 
 	/*Index organism*/
 	/*Group organism response into one variable*/
@@ -227,17 +243,13 @@ select
 		case when index_lda___0 in (1) then 'No risk factors identified' else '' end as none,
 		case when index_lda___9 in (1) then 'Missing/Unknown' else '' end as miss,
 
+		/*Days from identification to report and pps initiated*/
+		IDtoreport, IDtoPPS, reporttoPPS, IDtoPPS_flag, reporttoPPS_flag,
 		/*Screening counts*/
 		pps_num_p1,
 		pps_num_total,
 		pps_denom_p1,
 		pps_denom_total
-
-
-
-
-
-
 
 from MDRO_clean_1
 where redcap_repeat_instrument in ('screening_abstraction') and pps_flag in (1) 
@@ -248,7 +260,27 @@ where redcap_repeat_instrument in ('screening_abstraction') and pps_flag in (1)
 quit;
 
 
-proc freq data=MDRO_clean_2_screenings; tables organism_prompt /norow nocol nopercent nocum; where pos_result in (1);*where screening_id_new in ('103906387');run;
+/*Ok you can do this in a SAS data step like below, but I'm a sucker for translateable code so I used SQL*/
+/*SAS version:*/
+/*data table_1_mechanisms;*/
+/*    set MDRO_clean_2_screenings;*/
+/**/
+/*    length mechanism $20;*/
+/**/
+/*    if mech_kpc        = 'KPC'          then mechanism = 'KPC';*/
+/*    else if mech_ndm   = 'NDM'          then mechanism = 'NDM';*/
+/*    else if mech_oxa23_24 = 'OXA-23/24' then mechanism = 'OXA-23/24';*/
+/*    else if mech_oxa_48   = 'OXA-48'    then mechanism = 'OXA-48';*/
+/*    else if mech_vim   = 'VIM'          then mechanism = 'VIM';*/
+/*    else if mech_imp   = 'IMP'          then mechanism = 'IMP';*/
+/*    else if mech_other = 'Other'        then mechanism = 'Other';*/
+/*    else if mech_none  = 'None (C.auris)' then mechanism = 'None (C. auris)';*/
+/*    else if mech_unknown = 'Unknown'    then mechanism = 'Unknown';*/
+/*    else delete;*/
+/**/
+/*    keep screening_id mechanism;*/
+/*run;*/
+
 
 proc sql;
 /*PART I: Mechanisms*/
@@ -309,6 +341,7 @@ from MDRO_clean_2_screenings
 from MDRO_clean_2_screenings 
 	having mech_unknown ='Unknown'
 ;
+
 
 /*PART II: Risk Factors
 wound endo cenline othindwell immuno priorMDRO trav none miss */
@@ -417,7 +450,12 @@ select
 				d.year,
 				d.pos_result,
 				d.organism_prompt,
-				d.precautions
+				d.precautions,
+				d.IDtoreport,
+				d.IDtoPPS,
+				d.reporttoPPS,
+				d.IDtoPPS_flag,
+				d.reporttoPPS_flag
 			
 
 from table_1_mechanisms a left join table_1_riskfactors b
@@ -470,16 +508,9 @@ quit;
 
 
 
-
-proc print data=table_1_final_join noobs; run;
-
-
-
-
-
 title; footnote;
 /*Set your output pathway here*/
-ods excel file="C:\Users\mhoskins1\Desktop\Work Files\MDRO Screening RedCap\MDRO_analysis linelist_&sysdate..xlsx" style=pearl;
+ods excel file="T:\HAI\MDRO Surveillance\MDRO screening analysis\MDRO_analysis linelist_&sysdate..xlsx" style=pearl;
 ods excel options (sheet_interval = "now" sheet_name = "line list" embedded_titles='Yes');
 
 
@@ -493,7 +524,7 @@ ods excel close;
 
 title; footnote;
 /*Set your output pathway here*/
-ods excel file="C:\Users\mhoskins1\Desktop\Work Files\MDRO Screening RedCap\MDRO_PPS_screenings_longpivot.xlsx" style=pearl;
+ods excel file="T:\HAI\MDRO Surveillance\MDRO screening analysis\MDRO_PPS_screenings_longpivot.xlsx" style=pearl;
 ods excel options (sheet_interval = "now" sheet_name = "line list" embedded_titles='Yes');
 
 
@@ -504,112 +535,272 @@ ods excel close;
 
 
 
-proc freq data=MDRO_clean_2_screenings; tables precautions /norow nocol nopercent;run;
-
-
-
-proc sort data=table_1_final_join out=model_1 nodupkey;
-
-	by screening_id rf_groups hiacuity_hirf;
-
-run;
-
-
-
-
-proc freq data=model_1; table setting_class/ norow nocol nopercent nocum;run;
-
 /*Some modeling*/
-proc logistic
+/*take our final table and revert back to even level line*/
+proc sort data=table_1_final_join  out=model_1 nodupkey ;
 
-data=model_1 descending outmodel=model_PPS plots(only)=(oddsratio(range=clip));
-
-	class pos_result (param=ref ref='0') setting_class (param=ref ref='Acute Care Hospital') rf_groups (param=ref ref='0') precautions (param=ref ref='Yes');
-	/*building our model using total risk factors*/
-	model pos_result = rf_groups precautions setting_class / expb;
+	by descending screening_id rf_groups hiacuity_hirf ;
 
 run;
-
-
-proc freq data=model_1;
-tables pos_result*rf_groups / norow nocol nopercent expected; exact fisher chisq or relrisk riskdiff;
-run;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*KEY PIECE: Now we're going to use our model we created and apply it to each row with "score." The logistic formula logit (prob) = intercept + B1Var1 + B2Var2 + BnVarn will be applied to each row. Where B is the parameter and Var is the presence or category of the variable*/
-proc logistic inmodel=model_PPS;
-
-	score data=MDRO_clean_2_screenings out=mdro_pps_score  ;
-
-run;
-proc contents data=mdro_pps_score;run;
-
-
-proc print data=mdro_pps_score; var screening_id_new P_1;run;
-
 
 
 proc sql;
-create table test_sir_mdro as
+create table model_30day_viz as
 select
 
-	P_1 as mdro_pred_total "Total MDRO Predicted from PPS" format 10.2,
-	pos_result as mdro_act_total "Total MDRO Observed from PPS" format 10.0
+	screening_id,
+	pos_result,
+	case when pos_result in (1) then 'Yes' else 'No' end as pos_result_char,
+	organism_prompt,
+	case when organism_prompt in ('CRAB (A. baumanii)') then 'CRAB' else 'Not CRAB' end as CRAB_flag "Causitive organism; CRAB (A. baumanii)",
+	reporttoPPS "Report of MDRO to NCEDSS to PPS initiated",
+	IDtoreport "Lab result positive for MDRO to report to NCEDSS",
+	IDtoPPS "Lab result positive for MDRO to PPS initiated"
 
-from mdro_pps_score
+from model_1
 ;
-
-create table pps_mdro_Final as
+create table analysis_30day as
 select
 
-	mdro_pred_total,
-	mdro_act_total,
+	screening_id,
+	pos_result,
+	CRAB_flag,
+	case when reporttoPPS GE (30) then 1 else 0 end as reporttoPPS_30flag,
+	case when IDtoreport GE (30) then 1 else 0 end as IDtoreport_30flag,
+	case when IDtoPPS GE (30) then 1 else 0 end as IDtoPPS_30flag
 
-	mdro_act_total / mdro_pred_total as yield_ratio "Yield ratio actual:predicted",
-	(STDERR(calculated yield_ratio)) as std_err "Standard error"
-
-from test_sir_mdro
-;
-
-create table pps_mdro_final_2 as
-select
-
-	sum (mdro_act_total) as act_total "Total MDRO Observed from PPS" format 10.0,
-	sum (mdro_pred_total) as pred_total "Total MDRO Predicted from PPS" format 10.2,
-		calculated act_total / calculated pred_total as yield_ratio_total "Yield ratio actual:predicted" format 10.2,
-
+from model_30day_viz
 	
-	max(std_err) as std_err_calc "Standard error",
-		(calculated yield_ratio_total - (1.96*(calculated std_err_calc))) as lCL "Lower confidence limit" format 10.2,
-		(calculated yield_ratio_total + (1.96*(calculated std_err_calc))) as uCL "Upper confidence limit" format 10.2,
-
-		/*Add interpretation*/
-	case when calculated yield_ratio_total GE 1 and 1 < calculated lCL then "PPS returned MORE positives than expected"
-		 when calculated yield_ratio_total GE 1 and calculated uCL < 1 then "PPS returned LESS positives than expected"
-
-	else "PPS returned the SAME positives than expected" end as interp "Interpretion for PPS NC 2023-2025"
-
-
-
-from pps_mdro_final
 ;
-alter table pps_mdro_final_2 drop std_err_calc;
 quit;
 
+proc print data=analysis_30day noobs;run;
+/*Sort by CRAB yes/no*/
+proc sort data=analysis_30day; by reporttoPPS_30flag;run;
+
+/*Positive result based on 30+ days from time to report to PPS initiated, group by CRAB or not CRAB*/
+proc freq data=analysis_30day;
+tables pos_result*CRAB_flag / fisher norow nocol nopercent nocum expected;
+	by reporttoPPS_30flag;
+
+run;
+
+
+
+
+proc logistic
+data=analysis_30day descending;
+	class pos_result (param=ref ref='0') reporttoPPS_30flag (param=ref ref='0') CRAB_flag (param=ref ref='Not CRAB') ;
+	/*building our model using total risk factors*/
+	model pos_result =  reporttoPPS_30flag CRAB_flag / expb ;
+	oddsratio reporttoPPS_30flag;
+
+		*where organism_prompt in ('CRAB (A. baumanii)');
+run;
+
+
+
+
+/*Obviously just use this...*/
+ods output Summary=means_out;
+
+proc means data=model_30day_viz mean median range q1 q3 p90 maxdec=2 ; class pos_result_char CRAB_flag;
+var IDtoreport reporttoPPS IDtoPPS; 
+
+run;
+
+proc sql;
+create table metrics_IDtoreport as
+select
+
+	pos_result_char "Screening resulted in additional positive(s)?",
+	CRAB_flag, IDtoreport_Mean, IDtoreport_Median format 10.0, (IDtoreport_Q3 - IDtoreport_Q1) as IQR format 10.0, IDtoreport_Q1 "25th Percentile" format 10.0, IDtoreport_Q3 "75th Percentile" format 10.0, NObs "Count"
+
+from means_out
+	group by CRAB_flag, pos_result_char;
+
+
+create table metrics_reporttoPPS as
+select
+
+	pos_result_char "Screening resulted in additional positive(s)?",
+	CRAB_flag, reporttoPPS_Mean, reporttoPPS_Median format 10.0, (reporttoPPS_Q3 - reporttoPPS_Q1) as IQR format 10.0, reporttoPPS_Q1 "25th Percentile" format 10.0, reporttoPPS_Q3 "75th Percentile" format 10.0, NObs "Count"
+
+from means_out
+	group by CRAB_flag, pos_result_char;
+
+create table metrics_IDtoPPS as
+select
+
+	pos_result_char "Screening resulted in additional positive(s)?",
+	CRAB_flag, IDtoPPS_Mean, IDtoPPS_Median format 10.0, (IDtoPPS_Q3 - IDtoPPS_Q1) as IQR format 10.0, IDtoPPS_Q1 "25th Percentile" format 10.0, IDtoPPS_Q3 "75th Percentile" format 10.0, NObs "Count"
+
+from means_out
+	group by CRAB_flag, pos_result_char;
+
+create table pos_rate_CRABnoCRAB as
+select
+
+	sum (case when pos_result in (1) and CRAB_flag in ('CRAB') then 1 else 0 end) as sum_pos_CRAB "Total result in positive organism: CRAB",
+	sum (case when pos_result in (1,0) and CRAB_flag in ('CRAB') then 1 else 0 end) as total_CRAB "Total screenings organism: CRAB",
+		(calculated sum_pos_CRAB / calculated total_CRAB) as pos_rate_CRAB format percent10.1 "Positivity rate, organism: CRAB",
+
+	sum (case when pos_result in (1) and CRAB_flag in ('Not CRAB') then 1 else 0 end) as sum_pos_notCRAB "Total result in positive organism: Not CRAB",
+	sum (case when pos_result in (1,0) and CRAB_flag in ('Not CRAB') then 1 else 0 end) as total_notCRAB "Total screenings organism: Not CRAB",
+		(calculated sum_pos_notCRAB / calculated total_notCRAB) as pos_rate_noCRAB format percent10.1 "Positivity rate, organism: Not CRAB"
+
+from analysis_30day
+;
+
+quit;
+
+title justify=left height=8pt  'Positivity rate report to NCEDSS date to PPS initiated date, CRAB vs. Not CRAB';
+proc print data=pos_rate_CRABnoCRAB noobs label;run;
+
+title 'Metrics from lab ID date to state report date';
+proc print data=metrics_IDtoreport noobs label;run;
+
+title 'Metrics from state report date to PPS initiated date';
+proc print data=metrics_reporttoPPS noobs label;run;
+
+title 'Metrics from lab ID to PPS initiated date';
+proc print data=metrics_IDtoPPS noobs label;run;
+
+
+title 'Analysis CRAB vs. not CRAB and </> 30 days from report to PPS initiation';
+/*Positive result based on 30+ days from time to report to PPS initiated, group by CRAB or not CRAB*/
+proc freq data=analysis_30day;
+tables pos_result*CRAB_flag / fisher norow nocol nopercent nocum expected;
+	by reporttoPPS_30flag;
+
+run;
+
+
+
+%macro timetoevent_graph  (timetoevent=, eventlabel=);
+ods graphics / noborder;
+proc sgplot data=model_30day_viz noborder;
+/*Set style and contrast colors to be uniform throughout, otherwise SAS will use that gross pale blue and yuk red*/
+styleattrs datacolors=(cxA6CEE3 cx1F78B4)
+datacontrastcolors=(cxA6CEE3 cx1F78B4);
+
+/*Vbox statement: time to event by CRAB yes or no grouped by positivity*/
+    vbox  &timetoevent / category=CRAB_flag group=pos_result_char
+        fillattrs=(transparency=0.15)
+        meanattrs=(symbol=circlefilled color=black size=8)
+		medianattrs=(color=black pattern=dash thickness=2)
+        whiskerattrs=(thickness=1)
+		outlierattrs=(symbol=circlefilled size=6 color=red) /*Make outliers red*/
+		lineattrs=(thickness=0)
+			/*displaystats=(q1 q3 mean) abusrd that SAS doesn't support this with a group statement*/;
+
+/*Labels and standardized text size so it doesn't look like a 4 year old drew it*/
+    xaxis label="Organism (CRAB/not CRAB)" valueattrs= (family="Arial" size=8)
+		labelattrs= (family="Arial" weight=bold size=8);
+
+    yaxis min=0 max=80 label="&eventlabel" valueattrs= (family="Arial" size=8)
+		labelattrs= (family="Arial" weight=bold size=8);
+
+
+	keylegend / title="Screening resulted in Positive" location=outside position=bottom noborder titleattrs= (family="Arial" size=8 weight=bold) valueattrs= (family="Arial" size=8);
+
+
+run;
+%mend;
+
+
+
 dm 'odsresults; clear';
-proc print data=pps_mdro_final_2 noobs label;run;
+/*ODS PDF output*/
+ods graphics /noborder;
+title; footnote;
+
+/*Set your output pathway here*/ 
+ods excel file="T:\HAI\MDRO Surveillance\MDRO screening analysis\MDRO screening_30 day trends_&sysdate..xlsx" ; *style=Journal;
+
+ods excel options (sheet_interval = "none" sheet_name = "tables" embedded_titles='Yes');
+
+title justify=left height=8pt 'Metrics from lab ID date to state report date';
+proc print data=metrics_IDtoreport noobs label;run;
+
+title justify=left height=8pt 'Metrics from state report date to PPS initiated date';
+proc print data=metrics_reporttoPPS noobs label;run;
+
+title justify=left height=8pt 'Metrics from lab ID to PPS initiated date';
+proc print data=metrics_IDtoPPS noobs label;run;
+
+title justify=left height=8pt  'Positivity rate report to NCEDSS date to PPS initiated date, CRAB vs. Not CRAB';
+proc print data=pos_rate_CRABnoCRAB noobs label;run;
+
+
+
+
+title;
+
+ods excel options (sheet_interval = "now" sheet_name = "box charts" embedded_titles='Yes') style=HTMLBlue;
+
+title justify=left color=black height=8pt 'Metrics from lab ID date to state report date';
+%timetoevent_graph (timetoevent=IDtoreport, eventlabel=Days from MDRO lab identified to MDRO Reported);
+title justify=left color=black height=8pt 'Metrics from state report date to PPS initiated date';
+%timetoevent_graph (timetoevent=reporttoPPS, eventlabel=Days from MDRO reported to PPS initated);
+title justify=left color=black height=8pt 'Metrics from lab ID to PPS initiated date';
+%timetoevent_graph (timetoevent=IDtoPPS, eventlabel=Days from MDRO lab identified to PPS initated);
+
+
+
+ods excel options (sheet_interval = "now" sheet_name = "CRAB analysis" embedded_titles='Yes') style=HTMLBlue;
+/*Quick test to evaluate if CRAB as an organism results in a longer time to PPS response than non-CRAB from time of reporting to PPS initiation*/
+proc npar1way data=model_30day_viz wilcoxon plots(only)=(normalboxplot scores=data);
+title justify=left height=9pt"Nonparametric test to compare median time from NCEDSS reporting to PPS intiated among CRAB MDRO vs. non-CRAB MDRO";
+title2 justify=left height=8pt "Rank sum independent samples (WMW), outlier removed";
+	class CRAB_flag; /*yearly 90th percentile*/
+	var reporttoPPS; /*Use the rate to account for some providers having many more patients ie. family practice more than dental surgery see Gouin et a. (2019)*/
+
+			where reporttoPPS LT (60);
+
+run;
+
+
+ods excel options (sheet_interval = "now" sheet_name = "30 day analysis" embedded_titles='Yes') style=HTMLBlue;
+title 'Analysis CRAB vs. not CRAB and </> 30 days from report to PPS initiation';
+/*Positive result based on 30+ days from time to report to PPS initiated, group by CRAB or not CRAB*/
+proc freq data=analysis_30day;
+tables pos_result*CRAB_flag / fisher cmh norow nocol nopercent nocum expected;
+	by reporttoPPS_30flag;
+
+run;
+ods excel close;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+proc sort data=table_1_final_join out=model_30day_logit nodupkey ;
+
+	by screening_id  ;
+
+run;
+
+
+proc logistic
+data=model_30day_logit descending;
+	class pos_result (param=ref ref='0') IDtoPPS_flag (param=ref ref='0') ;
+	/*building our model using total risk factors*/
+	model pos_result =  IDtoPPS_flag / expb ;
+	oddsratio IDtoPPS_flag;
+
+		*where organism_prompt in ('CRAB (A. baumanii)');
+run;
+
+
+proc print data=table_1_final_join; var screening_id mechanism pos_result IDtoPPS_flag;run;
